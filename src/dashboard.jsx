@@ -18,20 +18,21 @@ import {
     FaSignOutAlt,
     FaSync
 } from 'react-icons/fa';
+import FileUploader from './FileUploader';
 import AuthContext from './AuthContext';
 import { useBlacklistData } from './BlacklistContext';
 
 const Dashboard = () => {
     const { user, logout } = useContext(AuthContext);
-    const { 
-        newBlacklistedNumbers, 
-        remainingScrubs, 
+    const {
+        newBlacklistedNumbers,
+        remainingScrubs,
         isLoading: isLoadingBlacklistData,
         error: blacklistError,
         lastUpdated,
         refreshData
     } = useBlacklistData(); // Use the blacklist data hook
-    
+
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [functionsOpen, setFunctionsOpen] = useState(false);
     const [activeSection, setActiveSection] = useState(null);
@@ -63,6 +64,16 @@ const Dashboard = () => {
         } finally {
             setIsRefreshingStats(false);
         }
+    };
+    const handleNumberUploadComplete = (data) => {
+        console.log('Number scrub completed:', data);
+        // You can add any additional handling here
+        // For example, showing a notification or updating UI
+    };
+
+    const handleEmailUploadComplete = (data) => {
+        console.log('Email scrub completed:', data);
+        // Additional handling
     };
 
     // Format the lastUpdated time to a friendly string
@@ -192,24 +203,24 @@ const Dashboard = () => {
         // Trim and validate email
         const trimmedEmail = email.trim().toLowerCase();
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
+
         if (!trimmedEmail) {
             setEmailError("Please enter an email address");
             return;
         }
-    
+
         if (!emailRegex.test(trimmedEmail)) {
             setEmailError("Please enter a valid email address");
             return;
         }
-    
+
         setEmailResult(null);
         setEmailError(null);
         setEmailLoading(true);
-    
+
         // Use Vite proxy configuration
         const apiUrl = `/api/emailbulk?key=${apiKey}`;
-    
+
         const options = {
             method: 'POST',
             headers: {
@@ -220,28 +231,28 @@ const Dashboard = () => {
                 emails: [trimmedEmail]
             })
         };
-    
+
         fetch(apiUrl, options)
             .then(async (res) => {
                 const contentType = res.headers.get('content-type');
-                
+
                 // Handle non-JSON responses
                 if (!contentType?.includes('application/json')) {
                     const text = await res.text();
                     console.error('Non-JSON response:', text);
                     throw new Error('Server returned unexpected format');
                 }
-    
+
                 const data = await res.json();
-                
+
                 if (!res.ok) {
                     console.error('API error response:', data);
                     throw new Error(data.message || `HTTP error ${res.status}`);
                 }
-    
+
                 // Handle array response
                 const result = Array.isArray(data) ? data[0] : data;
-                
+
                 return {
                     match: result.status === 0,
                     lists: result.lists || [],
@@ -255,13 +266,13 @@ const Dashboard = () => {
             })
             .catch(err => {
                 console.error('Email API Error:', err);
-                setEmailError(err.message.includes('unexpected format') 
+                setEmailError(err.message.includes('unexpected format')
                     ? 'Service temporarily unavailable. Please try again later.'
                     : err.message);
                 setEmailLoading(false);
             });
     };
-    
+
     const clearPhone = () => {
         setPhoneNumber('');
         setNumberResult(null);
@@ -291,9 +302,9 @@ const Dashboard = () => {
                     <div className="user-profile">
                         <FaUserCircle />
                         <span>{user?.email || "User"}</span>
-                        <button 
-                            onClick={handleLogout} 
-                            className="logout-btn" 
+                        <button
+                            onClick={handleLogout}
+                            className="logout-btn"
                             title="Logout"
                         >
                             <FaSignOutAlt />
@@ -567,12 +578,11 @@ const Dashboard = () => {
                                         {scrubNumberOpen && (
                                             <div className="accordion-content">
                                                 <p>Upload a CSV file with phone numbers to scrub against all selected feeds.</p>
-                                                <div className="file-upload">
-                                                    <input type="file" id="number-file" className="file-input" />
-                                                    <label htmlFor="number-file" className="file-label">Choose File</label>
-                                                    <span className="file-name">No file chosen</span>
-                                                </div>
-                                                <button className="primary-button mt-10">UPLOAD & SCRUB</button>
+                                                <FileUploader
+                                                    fileType="phone"
+                                                    apiKey={apiKey}
+                                                    onUploadComplete={handleNumberUploadComplete}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -586,12 +596,11 @@ const Dashboard = () => {
                                         {scrubEmailOpen && (
                                             <div className="accordion-content">
                                                 <p>Upload a CSV file with email addresses to scrub against the Blacklist Database.</p>
-                                                <div className="file-upload">
-                                                    <input type="file" id="email-file" className="file-input" />
-                                                    <label htmlFor="email-file" className="file-label">Choose File</label>
-                                                    <span className="file-name">No file chosen</span>
-                                                </div>
-                                                <button className="primary-button mt-10">UPLOAD & SCRUB</button>
+                                                <FileUploader
+                                                    fileType="email"
+                                                    apiKey={apiKey}
+                                                    onUploadComplete={handleEmailUploadComplete}
+                                                />
                                             </div>
                                         )}
                                     </div>
@@ -601,12 +610,11 @@ const Dashboard = () => {
                                             <h4>Upload Internal Suppression/DNC File</h4>
                                             <span className="upload-note">(single-column csv or txt files only)</span>
                                         </div>
-                                        <div className="file-upload">
-                                            <input type="file" id="suppression-file" className="file-input" />
-                                            <label htmlFor="suppression-file" className="file-label">Choose File</label>
-                                            <span className="file-name">No file chosen</span>
-                                        </div>
-                                        <button className="primary-button mt-10">UPLOAD</button>
+                                        <FileUploader
+                                            fileType="suppression"
+                                            apiKey={apiKey}
+                                            onUploadComplete={(data) => console.log('Suppression file uploaded:', data)}
+                                        />
                                     </div>
 
 
@@ -615,13 +623,13 @@ const Dashboard = () => {
                         </div>
                     ) : (
                         <>
-                              <div className="welcome-section">
+                            <div className="welcome-section">
                                 <h2>Hello {user?.name || 'MARS Advertising LLC'},</h2>
                                 <div className="stats-container">
                                     <div className="stat-item">
                                         <div className="stat-header">
                                             <span className="stat-label">New Blacklisted Numbers Today</span>
-                                            <button 
+                                            <button
                                                 className="refresh-button"
                                                 onClick={handleRefreshBlacklistData}
                                                 disabled={isRefreshingStats}
