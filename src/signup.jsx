@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { FaUserAlt, FaEnvelope, FaLock, FaArrowRight } from 'react-icons/fa';
 import './styles/auth.css';
+import AuthContext from './AuthContext';
 
-const Signup = ({ onSignup, onNavigateToLogin }) => {
+const Signup = ({ onNavigateToLogin }) => {
+    const { signup, error: authError } = useContext(AuthContext);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
@@ -10,7 +12,7 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         
         if (!name || !email || !password || !confirmPassword) {
@@ -23,14 +25,16 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
             return;
         }
         
-        // In a real app, you would send the registration data to a backend
         setIsLoading(true);
         
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            await signup(name, email, password);
+            // No need to navigate - App.jsx will handle this based on auth state
+        } catch (err) {
+            setError(err.message || 'Signup failed. Please try again.');
+        } finally {
             setIsLoading(false);
-            onSignup(email);
-        }, 1000);
+        }
     };
 
     return (
@@ -43,7 +47,7 @@ const Signup = ({ onSignup, onNavigateToLogin }) => {
                 
                 <h2 className="auth-title">Create New Account</h2>
                 
-                {error && <div className="auth-error">{error}</div>}
+                {(error || authError) && <div className="auth-error">{error || authError}</div>}
                 
                 <form className="auth-form" onSubmit={handleSubmit}>
                     <div className="form-group">

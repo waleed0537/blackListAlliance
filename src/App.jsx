@@ -1,58 +1,65 @@
-import { useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import './App.css';
-import Dashboard from './dashboard'; // Update the path as needed
+import Dashboard from './dashboard';
 import Login from './login';
 import Signup from './signup';
+import { AuthProvider, AuthContext } from './AuthContext';
+import { BlacklistProvider } from './BlacklistContext'; // Updated import path
+
+// App wrapper with AuthProvider and BlacklistProvider
+function AppWrapper() {
+  return (
+    <AuthProvider>
+      <BlacklistProvider>
+        <App />
+      </BlacklistProvider>
+    </AuthProvider>
+  );
+}
 
 function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard'); // 'login', 'signup', or 'dashboard'
-  const [user, setUser] = useState(null);
+  const { user, isAuthenticated, loading } = useContext(AuthContext);
+  const [currentPage, setCurrentPage] = useState(isAuthenticated ? 'dashboard' : 'login');
+
+  // Update current page based on authentication status
+  useEffect(() => {
+    if (isAuthenticated) {
+      setCurrentPage('dashboard');
+    } else {
+      setCurrentPage('login');
+    }
+  }, [isAuthenticated]);
 
   // Navigation handlers
   const handleNavigateToLogin = () => setCurrentPage('login');
   const handleNavigateToSignup = () => setCurrentPage('signup');
   const handleNavigateToDashboard = () => setCurrentPage('dashboard');
 
-  // Auth handlers
-  const handleLogin = (email) => {
-    setUser({ email });
-    handleNavigateToDashboard();
-  };
-
-  const handleSignup = (email) => {
-    setUser({ email });
-    handleNavigateToDashboard();
-  };
-
-  const handleLogout = () => {
-    setUser(null);
-    handleNavigateToLogin();
-  };
+  // Show loading state while checking authentication
+  if (loading) {
+    return <div className="loading-container">Loading...</div>;
+  }
 
   // Render the appropriate component based on current page
   return (
     <>
       {currentPage === 'login' && (
         <Login 
-          onLogin={handleLogin} 
           onNavigateToSignup={handleNavigateToSignup} 
         />
       )}
       
       {currentPage === 'signup' && (
         <Signup 
-          onSignup={handleSignup} 
           onNavigateToLogin={handleNavigateToLogin} 
         />
       )}
       
-      {currentPage === 'dashboard' && (
-        <Dashboard 
-          onLogout={handleLogout}
-        />
+      {currentPage === 'dashboard' && isAuthenticated && (
+        <Dashboard />
       )}
     </>
   );
 }
 
-export default App;
+export default AppWrapper;

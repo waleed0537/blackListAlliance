@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { FaUserAlt, FaLock, FaArrowRight } from 'react-icons/fa';
 import './styles/auth.css';
+import AuthContext from './AuthContext';
 
-const Login = ({ onLogin, onNavigateToSignup }) => {
+const Login = ({ onNavigateToSignup }) => {
+    const { login, error: authError } = useContext(AuthContext);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
         
         if (!email || !password) {
@@ -16,14 +18,16 @@ const Login = ({ onLogin, onNavigateToSignup }) => {
             return;
         }
         
-        // In a real app, you would validate credentials against a backend
         setIsLoading(true);
         
-        // Simulate API call
-        setTimeout(() => {
+        try {
+            await login(email, password);
+            // No need to navigate - App.jsx will handle this based on auth state
+        } catch (err) {
+            setError(err.message || 'Login failed. Please check your credentials.');
+        } finally {
             setIsLoading(false);
-            onLogin(email);
-        }, 1000);
+        }
     };
 
     return (
@@ -36,7 +40,7 @@ const Login = ({ onLogin, onNavigateToSignup }) => {
                 
                 <h2 className="auth-title">Login to Your Account</h2>
                 
-                {error && <div className="auth-error">{error}</div>}
+                {(error || authError) && <div className="auth-error">{error || authError}</div>}
                 
                 <form className="auth-form" onSubmit={handleSubmit}>
                     <div className="form-group">

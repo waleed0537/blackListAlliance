@@ -1,5 +1,4 @@
-// Dashboard.jsx
-import React, { useState } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import './styles/dashboard.css';
 import {
     FaHome,
@@ -15,10 +14,24 @@ import {
     FaUserCircle,
     FaChevronDown,
     FaChevronUp,
-    FaEnvelope
+    FaEnvelope,
+    FaSignOutAlt,
+    FaSync
 } from 'react-icons/fa';
+import AuthContext from './AuthContext';
+import { useBlacklistData } from './BlacklistContext';
 
 const Dashboard = () => {
+    const { user, logout } = useContext(AuthContext);
+    const { 
+        newBlacklistedNumbers, 
+        remainingScrubs, 
+        isLoading: isLoadingBlacklistData,
+        error: blacklistError,
+        lastUpdated,
+        refreshData
+    } = useBlacklistData(); // Use the blacklist data hook
+    
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [functionsOpen, setFunctionsOpen] = useState(false);
     const [activeSection, setActiveSection] = useState(null);
@@ -37,7 +50,27 @@ const Dashboard = () => {
     const [emailError, setEmailError] = useState(null);
     const [numberLoading, setNumberLoading] = useState(false);
     const [emailLoading, setEmailLoading] = useState(false);
+    const [isRefreshingStats, setIsRefreshingStats] = useState(false);
     const apiKey = "Pkcka4f2BbdHh2FhzJtx";
+
+    // Function to manually refresh blacklist data
+    const handleRefreshBlacklistData = async () => {
+        setIsRefreshingStats(true);
+        try {
+            await refreshData(true); // Force refresh data from server
+        } catch (error) {
+            console.error('Error refreshing blacklist data:', error);
+        } finally {
+            setIsRefreshingStats(false);
+        }
+    };
+
+    // Format the lastUpdated time to a friendly string
+    const formatLastUpdated = () => {
+        if (!lastUpdated) return '';
+        const updatedDate = new Date(lastUpdated);
+        return updatedDate.toLocaleString();
+    };
 
     const toggleSidebar = () => {
         setSidebarOpen(!sidebarOpen);
@@ -87,6 +120,11 @@ const Dashboard = () => {
     const toggleApiStats = () => {
         setApiStatsOpen(!apiStatsOpen);
     };
+
+    const handleLogout = () => {
+        logout();
+    };
+
 
     const handlePhoneLookup = () => {
         // Remove any non-digit characters except the plus sign at the start
@@ -223,6 +261,7 @@ const Dashboard = () => {
                 setEmailLoading(false);
             });
     };
+    
     const clearPhone = () => {
         setPhoneNumber('');
         setNumberResult(null);
@@ -251,7 +290,14 @@ const Dashboard = () => {
                 <div className="header-right">
                     <div className="user-profile">
                         <FaUserCircle />
-                        <span>rainomanraza@gmail.com</span>
+                        <span>{user?.email || "User"}</span>
+                        <button 
+                            onClick={handleLogout} 
+                            className="logout-btn" 
+                            title="Logout"
+                        >
+                            <FaSignOutAlt />
+                        </button>
                     </div>
                 </div>
             </header>
@@ -569,18 +615,47 @@ const Dashboard = () => {
                         </div>
                     ) : (
                         <>
-                            <div className="welcome-section">
-                                <h2>Hello MARS Advertising LLC,</h2>
+                              <div className="welcome-section">
+                                <h2>Hello {user?.name || 'MARS Advertising LLC'},</h2>
                                 <div className="stats-container">
                                     <div className="stat-item">
-                                        <span className="stat-label">New Blacklisted Numbers Today</span>
-                                        <span className="stat-value">869</span>
+                                        <div className="stat-header">
+                                            <span className="stat-label">New Blacklisted Numbers Today</span>
+                                            <button 
+                                                className="refresh-button"
+                                                onClick={handleRefreshBlacklistData}
+                                                disabled={isRefreshingStats}
+                                                title="Refresh Stats"
+                                            >
+                                                <FaSync className={isRefreshingStats ? 'spinning' : ''} />
+                                            </button>
+                                        </div>
+                                        {isLoadingBlacklistData ? (
+                                            <div className="stat-loading">Loading...</div>
+                                        ) : blacklistError ? (
+                                            <div className="stat-error">Error loading data</div>
+                                        ) : (
+                                            <span className="stat-value">{newBlacklistedNumbers || '—'}</span>
+                                        )}
                                     </div>
                                     <div className="stat-item">
-                                        <span className="stat-label">Remaining Scrubs</span>
-                                        <span className="stat-value">47,995,198</span>
+                                        <div className="stat-header">
+                                            <span className="stat-label">Remaining Scrubs</span>
+                                        </div>
+                                        {isLoadingBlacklistData ? (
+                                            <div className="stat-loading">Loading...</div>
+                                        ) : blacklistError ? (
+                                            <div className="stat-error">Error loading data</div>
+                                        ) : (
+                                            <span className="stat-value">{remainingScrubs || '—'}</span>
+                                        )}
                                     </div>
                                 </div>
+                                {lastUpdated && (
+                                    <div className="last-updated">
+                                        Last updated: {formatLastUpdated()}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="cards-grid">

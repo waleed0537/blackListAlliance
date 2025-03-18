@@ -763,7 +763,90 @@ body {
     font-size: 1.5rem;
   }
 }
+.user-profile svg {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+/* Add these styles to your dashboard.css file */
 
+/* Stats refresh button */
+.stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.refresh-button {
+  background: none;
+  border: none;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 0.8rem;
+  padding: 5px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.refresh-button:hover {
+  color: var(--primary-color);
+  background-color: rgba(229, 43, 43, 0.1);
+}
+
+.refresh-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Animation for the refresh icon */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+/* Last updated text */
+.last-updated {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  margin-top: 0.5rem;
+  text-align: right;
+}
+
+/* Stats loading and error states */
+.stat-loading, .stat-error {
+  font-size: 1rem;
+  color: var(--text-light);
+}
+
+.stat-error {
+  color: var(--primary-color);
+}
+
+/* Empty stat placeholder */
+.stat-value:empty::after {
+  content: "—";
+  color: var(--text-light);
+}
+
+.logout-btn {
+  background: none;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  margin-left: 10px;
+  transition: var(--transition);
+  font-size: 1rem;
+  display: flex;
+  align-items: center;
+}
+
+.logout-btn:hover {
+  color: var(--primary-color);
+}
 @media (max-width: 480px) {
   .header {
     padding: 0.6rem 1rem;
