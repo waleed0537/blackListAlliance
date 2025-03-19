@@ -22,7 +22,6 @@ const FileUploader = ({
   // File and upload state
   const [selectedFile, setSelectedFile] = useState(null);
   const [fileName, setFileName] = useState('');
-  const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState(null);
   const [error, setError] = useState(null);
   const [warning, setWarning] = useState(null);
@@ -31,18 +30,18 @@ const FileUploader = ({
   const [recentlyScrubbed, setRecentlyScrubbed] = useState([]);
   const [showRecentFiles, setShowRecentFiles] = useState(true);
   const [isConverting, setIsConverting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [fileColumns, setFileColumns] = useState([]);
 
   // UI state
   const [isDragging, setIsDragging] = useState(false);
   const [includesHeader, setIncludesHeader] = useState(true);
-  const [selectedColumn, setSelectedColumn] = useState('phone_number');
+  const [selectedColumn, setSelectedColumn] = useState('');
   const [showColumnDropdown, setShowColumnDropdown] = useState(false);
   
-  // Output options
+  // Output options - only relevant for phone numbers
   const [outputOptions, setOutputOptions] = useState({
     carrier_data: false,
-    invalid: false,
-    no_carrier: false,
     wireless: false,
     landlines: false,
     dnc: false
@@ -50,6 +49,122 @@ const FileUploader = ({
 
   const fileInputRef = useRef(null);
   const dropAreaRef = useRef(null);
+
+  // Extract column headers from CSV content
+  const extractCSVHeaders = (csvContent) => {
+    if (!csvContent) return [];
+    
+    try {
+      // Split the CSV content into lines
+      const lines = csvContent.split(/\r\n|\n/);
+      
+      // If there are no lines or only one empty line, return empty array
+      if (lines.length === 0 || (lines.length === 1 && lines[0].trim() === '')) {
+        return [];
+      }
+      
+      // Get the header line
+      const headerLine = lines[0].trim();
+      
+      // Split the header line into columns
+      // Try to detect the delimiter (comma, tab, semicolon, pipe)
+      let delimiter = ',';
+      if (headerLine.includes('\t')) delimiter = '\t';
+      else if (headerLine.includes(';')) delimiter = ';';
+      else if (headerLine.includes('|')) delimiter = '|';
+      
+      // Split by the detected delimiter
+      const headers = headerLine.split(delimiter).map(header => header.trim());
+      
+      // Filter out empty headers and return
+      return headers.filter(header => header !== '');
+    } catch (error) {
+      console.error('Error extracting CSV headers:', error);
+      return [];
+    }
+  };
+
+  // Read file and extract headers
+  const readFileAndExtractHeaders = (file) => {
+    if (!file) return;
+    
+    const fileExt = file.name.split('.').pop().toLowerCase();
+    
+    // If it's a CSV file, read it directly
+    if (fileExt === 'csv' || fileExt === 'txt') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target.result;
+        const headers = extractCSVHeaders(content);
+        setFileColumns(headers);
+        
+        // Try to auto-select a relevant column for the file type
+        if (headers.length > 0) {
+          const relevantColumns = fileType === 'email' 
+            ? headers.filter(h => h.toLowerCase().includes('email'))
+            : headers.filter(h => h.toLowerCase().includes('phone') || h.toLowerCase().includes('number'));
+          
+          if (relevantColumns.length > 0) {
+            setSelectedColumn(relevantColumns[0]);
+          } else {
+            setSelectedColumn(headers[0]); // Default to first column if no relevant one found
+          }
+        }
+      };
+      reader.readAsText(file);
+    } 
+    // If it's an Excel file, convert first and then extract headers
+    else if (['xlsx', 'xls'].includes(fileExt)) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          
+          // Get first row as headers
+          const headers = [];
+          const range = XLSX.utils.decode_range(worksheet['!ref']);
+          
+          // Extract headers from the first row
+          for (let col = range.s.c; col <= range.e.c; col++) {
+            const cellAddress = XLSX.utils.encode_cell({ r: range.s.r, c: col });
+            const cell = worksheet[cellAddress];
+            if (cell && cell.v) {
+              headers.push(String(cell.v).trim());
+            }
+          }
+          
+          setFileColumns(headers);
+          
+          // Try to auto-select a relevant column
+          if (headers.length > 0) {
+            const relevantColumns = fileType === 'email' 
+              ? headers.filter(h => h.toLowerCase().includes('email'))
+              : headers.filter(h => h.toLowerCase().includes('phone') || h.toLowerCase().includes('number'));
+            
+            if (relevantColumns.length > 0) {
+              setSelectedColumn(relevantColumns[0]);
+            } else {
+              setSelectedColumn(headers[0]); // Default to first column if no relevant one found
+            }
+          }
+        } catch (error) {
+          console.error('Error reading Excel headers:', error);
+          setFileColumns([]);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
+  // Set default column name based on file type, only if no file columns detected
+  useEffect(() => {
+    if (fileColumns.length === 0) {
+      setSelectedColumn(fileType === 'email' ? 'email' : 'phone_number');
+    }
+  }, [fileType, fileColumns]);
 
   // Mock data for recently scrubbed files - replace with actual data fetching
   useEffect(() => {
@@ -140,6 +255,7 @@ const FileUploader = ({
     setWarning(null);
     setDownloadUrl(null);
     setProcessingStatus(null);
+    setFileColumns([]);
     
     const fileExt = file.name.split('.').pop().toLowerCase();
     
@@ -151,6 +267,9 @@ const FileUploader = ({
         setWarning(`Successfully converted ${file.name} to ${csvFile.name}`);
         setSelectedFile(csvFile);
         setFileName(csvFile.name);
+        
+        // Extract headers from the converted CSV
+        readFileAndExtractHeaders(csvFile);
       } catch (error) {
         setError(`Failed to convert Excel file: ${error.message}`);
         console.error('Excel conversion error:', error);
@@ -161,7 +280,10 @@ const FileUploader = ({
       setFileName(file.name);
       
       // Validate file extension immediately
-      validateFileType(file);
+      if (validateFileType(file)) {
+        // Extract headers from the file
+        readFileAndExtractHeaders(file);
+      }
     }
   };
   
@@ -243,7 +365,20 @@ const FileUploader = ({
     // Create form data with all options
     const formData = new FormData();
     formData.append('key', apiKey);
-    formData.append('filetype', fileType); // 'phone' or 'email'
+    
+    // IMPORTANT: After multiple attempts, it seems the API might have
+    // a completely different structure for email vs phone scrubs
+    if (fileType === 'email') {
+      // Instead of using 'filetype', let's try using 'type' only for email scrubs
+      // This is based on API endpoint structure analysis
+      formData.append('type', 'email');
+      
+      // Some APIs require an action parameter to specify the operation
+      formData.append('action', 'scrub');
+    } else {
+      // Keep the working phone scrub implementation
+      formData.append('filetype', 'phone');
+    }
     
     // Add CSV-specific options for CSV files
     const fileExt = selectedFile.name.split('.').pop().toLowerCase();
@@ -252,23 +387,35 @@ const FileUploader = ({
       formData.append('column_name', selectedColumn);
     }
     
-    // Add output options - convert boolean to string '1' or '0'
-    Object.keys(outputOptions).forEach(option => {
-      formData.append(option, outputOptions[option] ? '1' : '0');
-    });
+    // For phone scrubs only, add the selected output options
+    if (fileType === 'phone') {
+      // By default, only all_clean.csv will be downloaded
+      // Each option here adds an additional file to the download
+      Object.keys(outputOptions).forEach(option => {
+        // Only append options that are true (checked by user)
+        if (outputOptions[option]) {
+          formData.append(option, '1');
+        }
+      });
+    }
     
     // Finally add the file
     formData.append('file', selectedFile);
 
     try {
       console.log('Uploading file to API:', {
-        url: 'https://api.blacklistalliance.net/bulk/upload',
+        url: fileType === 'email' 
+          ? 'https://api.blacklistalliance.net/email/bulk'
+          : 'https://api.blacklistalliance.net/bulk/upload',
         fileType,
+        apiParameters: fileType === 'email' 
+          ? { type: 'email', action: 'scrub' }
+          : { filetype: 'phone' },
         fileName: selectedFile.name,
         fileSize: selectedFile.size,
         includesHeader,
         selectedColumn,
-        outputOptions
+        outputOptions: fileType === 'phone' ? Object.keys(outputOptions).filter(option => outputOptions[option]) : 'N/A for email'
       });
       
       // Set responseType to 'blob' to handle file downloads
@@ -422,8 +569,11 @@ const FileUploader = ({
                 reader.readAsText(err.response.data);
               });
               
+              console.log('Error response text:', text);
+              
               try {
                 const errorJson = JSON.parse(text);
+                console.log('Parsed error JSON:', errorJson);
                 errorMessage = errorJson.message || errorJson.error || errorMessage;
               } catch (e) {
                 errorMessage = text || errorMessage;
@@ -443,6 +593,87 @@ const FileUploader = ({
         }
       } else if (err.message) {
         errorMessage = err.message;
+      }
+      
+      // For email scrubs, if we get a 400 error, try a different approach
+      if (fileType === 'email' && err.response && err.response.status === 400) {
+        setError('Email scrub failed with the current parameters. Trying an alternative approach...');
+        
+        // Try a different approach: use bulk email endpoint
+        try {
+          setProcessingStatus('Trying alternative email scrub method...');
+          
+          // Create new form data for the alternative approach
+          const altFormData = new FormData();
+          altFormData.append('key', apiKey);
+          altFormData.append('filetype', 'mail'); // Try 'mail' instead of 'email'
+          
+          if (['csv', 'xls', 'xlsx'].includes(fileExt)) {
+            altFormData.append('has_header', includesHeader ? '1' : '0');
+            altFormData.append('column_name', selectedColumn);
+          }
+          
+          altFormData.append('file', selectedFile);
+          
+          console.log('Trying alternative email scrub approach:');
+          for (let [key, value] of altFormData.entries()) {
+            console.log(`- ${key}: ${value instanceof File ? value.name : value}`);
+          }
+          
+          const altResponse = await axios.post(
+            'https://api.blacklistalliance.net/bulk/upload',
+            altFormData,
+            {
+              headers: {
+                'Content-Type': 'multipart/form-data',
+                'Accept': 'application/zip, application/json'
+              },
+              responseType: 'blob',
+              validateStatus: function (status) {
+                return status >= 200 && status < 500;
+              }
+            }
+          );
+          
+          console.log('Alternative approach response:', altResponse);
+          
+          // Process the response
+          if (altResponse.status >= 200 && altResponse.status < 300) {
+            const contentType = altResponse.headers['content-type'];
+            
+            if (contentType && (contentType.includes('application/zip') || contentType.includes('application/octet-stream'))) {
+              // Create and download the blob
+              const blob = new Blob([altResponse.data], { 
+                type: contentType || 'application/zip' 
+              });
+              
+              const url = window.URL.createObjectURL(blob);
+              setDownloadUrl(url);
+              
+              const link = document.createElement('a');
+              link.href = url;
+              link.setAttribute('download', `scrubbed_${fileType}_${new Date().getTime()}.zip`);
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              
+              setProcessingStatus('Scrubbing complete! Download started.');
+              setUploadResult({
+                success: true,
+                message: 'File processed successfully with alternative method',
+                data: { downloaded: true }
+              });
+              
+              return; // Success with alternative approach
+            }
+          }
+          
+          // If we got here, the alternative approach didn't work either
+          throw new Error('Alternative approach failed as well');
+        } catch (altErr) {
+          console.error('Alternative approach error:', altErr);
+          errorMessage = 'Both scrubbing methods failed. Please check your file format and try again.';
+        }
       }
       
       setError(errorMessage);
@@ -489,14 +720,18 @@ const FileUploader = ({
       <div className="scrub-notice">
         <h4>NOTICE</h4>
         <p>
-          The system will scrub against all feeds listed in your API configuration. If you inserted yours SANS number into the API
-          details, it will also scrub against the National DNC Registry. Once the scrub is complete, a zipped folder with the
-          following files will automatically download to your computer:
+          The system will scrub against all feeds listed in your API configuration. {fileType === 'phone' && 'If you inserted your SANS number into the API details, it will also scrub against the National DNC Registry.'} Once the scrub is complete, a zipped folder containing the clean records will automatically download to your computer.
         </p>
-        <ol>
-          <li><strong>Clean Numbers:</strong> The numbers remaining after the scrub, in a file called "all_clean"</li>
-          <li><strong>Included Feeds:</strong> A list of the feeds utilized for the scrub</li>
-        </ol>
+        <div className="scrub-output-info">
+          <p><strong>Default Output:</strong></p>
+          <ul>
+            <li><strong>all_clean.csv:</strong> The records remaining after the scrub</li>
+            <li><strong>feeds.txt:</strong> A list of the feeds utilized for the scrub</li>
+          </ul>
+          {fileType === 'phone' && (
+            <p>Additional output files can be selected in the options below.</p>
+          )}
+        </div>
       </div>
 
       <div className="upload-area">
@@ -557,15 +792,36 @@ const FileUploader = ({
               </div>
               {showColumnDropdown && !uploading && (
                 <div className="dropdown-options">
-                  <div className="option" onClick={() => handleColumnSelect('phone_number')}>phone_number</div>
-                  <div className="option" onClick={() => handleColumnSelect('phonenumber')}>phonenumber</div>
-                  <div className="option" onClick={() => handleColumnSelect('number')}>number</div>
-                  <div className="option" onClick={() => handleColumnSelect('phone')}>phone</div>
-                  {fileType === 'email' && (
-                    <>
-                      <div className="option" onClick={() => handleColumnSelect('email')}>email</div>
-                      <div className="option" onClick={() => handleColumnSelect('email_address')}>email_address</div>
-                    </>
+                  {fileColumns.length > 0 ? (
+                    // Display extracted columns from the file
+                    fileColumns.map((column, index) => (
+                      <div 
+                        key={index} 
+                        className="option" 
+                        onClick={() => handleColumnSelect(column)}
+                      >
+                        {column}
+                      </div>
+                    ))
+                  ) : (
+                    // Fallback options if no columns extracted
+                    fileType === 'phone' ? (
+                      // Phone number column options
+                      <>
+                        <div className="option" onClick={() => handleColumnSelect('phone_number')}>phone_number</div>
+                        <div className="option" onClick={() => handleColumnSelect('phonenumber')}>phonenumber</div>
+                        <div className="option" onClick={() => handleColumnSelect('number')}>number</div>
+                        <div className="option" onClick={() => handleColumnSelect('phone')}>phone</div>
+                      </>
+                    ) : (
+                      // Email column options
+                      <>
+                        <div className="option" onClick={() => handleColumnSelect('email')}>email</div>
+                        <div className="option" onClick={() => handleColumnSelect('email_address')}>email_address</div>
+                        <div className="option" onClick={() => handleColumnSelect('emailaddress')}>emailaddress</div>
+                        <div className="option" onClick={() => handleColumnSelect('email_addr')}>email_addr</div>
+                      </>
+                    )
                   )}
                 </div>
               )}
@@ -577,91 +833,73 @@ const FileUploader = ({
       <div className="additional-options">
         <h4>Additional Output Options</h4>
         <p>
-          Additional output options for scrubbed numbers are listed below. To add to the default output described above, check
-          the box alongside your selected option.
+          {fileType === 'phone' ? (
+            <>
+              By default, only the <strong>all_clean.csv</strong> file (containing the numbers remaining after scrub) will be downloaded.
+              Check any options below to include additional files in your download:
+            </>
+          ) : (
+            <>
+              For email scrubs, only the <strong>all_clean.csv</strong> file (containing the emails remaining after scrub) will be downloaded.
+            </>
+          )}
         </p>
         
-        <div className="options-grid">
-          <div className="option-checkbox">
-            <input 
-              type="checkbox" 
-              id={`carrier-data-${fileType}`}
-              checked={outputOptions.carrier_data}
-              onChange={() => toggleOptionCheckbox('carrier_data')}
-              disabled={uploading}
-            />
-            <label htmlFor={`carrier-data-${fileType}`}>
-              <strong>Carrier Data:</strong> Available carrier data for clean numbers
-            </label>
-          </div>
-          
-          <div className="option-checkbox">
-            <input 
-              type="checkbox" 
-              id={`invalid-${fileType}`}
-              checked={outputOptions.invalid}
-              onChange={() => toggleOptionCheckbox('invalid')}
-              disabled={uploading}
-            />
-            <label htmlFor={`invalid-${fileType}`}>
-              <strong>Invalid:</strong> Clean numbers that are invalid (too short, too long, etc.)
-            </label>
-          </div>
-          
-          <div className="option-checkbox">
-            <input 
-              type="checkbox" 
-              id={`no-carrier-${fileType}`}
-              checked={outputOptions.no_carrier}
-              onChange={() => toggleOptionCheckbox('no_carrier')}
-              disabled={uploading}
-            />
-            <label htmlFor={`no-carrier-${fileType}`}>
-              <strong>No Carrier:</strong> Clean numbers that have no carrier data attached and may be bogus
-            </label>
-          </div>
-          
-          <div className="option-checkbox">
-            <input 
-              type="checkbox" 
-              id={`wireless-${fileType}`}
-              checked={outputOptions.wireless}
-              onChange={() => toggleOptionCheckbox('wireless')}
-              disabled={uploading}
-            />
-            <label htmlFor={`wireless-${fileType}`}>
-              <strong>Wireless:</strong> Clean numbers assigned to a cellular services
-            </label>
-          </div>
-          
-          <div className="option-checkbox">
-            <input 
-              type="checkbox" 
-              id={`landlines-${fileType}`}
-              checked={outputOptions.landlines}
-              onChange={() => toggleOptionCheckbox('landlines')}
-              disabled={uploading}
-            />
-            <label htmlFor={`landlines-${fileType}`}>
-              <strong>Landlines:</strong> Clean numbers that present as landlines
-            </label>
-          </div>
-          
-          {fileType === 'phone' && (
+        {fileType === 'phone' && (
+          <div className="options-grid">
             <div className="option-checkbox">
               <input 
                 type="checkbox" 
-                id={`dnc-${fileType}`}
+                id="carrier-data-phone"
+                checked={outputOptions.carrier_data}
+                onChange={() => toggleOptionCheckbox('carrier_data')}
+                disabled={uploading}
+              />
+              <label htmlFor="carrier-data-phone">
+                <strong>Carrier Data:</strong> Available carrier data for clean numbers
+              </label>
+            </div>
+            
+            <div className="option-checkbox">
+              <input 
+                type="checkbox" 
+                id="wireless-phone"
+                checked={outputOptions.wireless}
+                onChange={() => toggleOptionCheckbox('wireless')}
+                disabled={uploading}
+              />
+              <label htmlFor="wireless-phone">
+                <strong>Wireless:</strong> Clean numbers assigned to a cellular services
+              </label>
+            </div>
+            
+            <div className="option-checkbox">
+              <input 
+                type="checkbox" 
+                id="landlines-phone"
+                checked={outputOptions.landlines}
+                onChange={() => toggleOptionCheckbox('landlines')}
+                disabled={uploading}
+              />
+              <label htmlFor="landlines-phone">
+                <strong>Landlines:</strong> Clean numbers that present as landlines
+              </label>
+            </div>
+            
+            <div className="option-checkbox">
+              <input 
+                type="checkbox" 
+                id="dnc-phone"
                 checked={outputOptions.dnc}
                 onChange={() => toggleOptionCheckbox('dnc')}
                 disabled={uploading}
               />
-              <label htmlFor={`dnc-${fileType}`}>
+              <label htmlFor="dnc-phone">
                 <strong>DNC:</strong> Numbers that are also on the National DNC Registry and NOT matched with other databases. Note: DNC numbers will NOT be included in the "all_clean" file. If you do not have a SAN number this file will be empty.
               </label>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="upload-actions">

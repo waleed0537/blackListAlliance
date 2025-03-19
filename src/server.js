@@ -1,23 +1,35 @@
-// server.js
+// server.js - Corrected and Complete Version
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
+const nodemailer = require('nodemailer');
 const { getBlacklistData } = require('./scrapper'); // Make sure path is correct
 const cron = require('node-cron');
 
+// Load environment variables
 dotenv.config();
 
 const app = express();
 
+// Improved CORS configuration
+const corsOptions = {
+  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4000'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token', 'Accept'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
 // Middleware
 app.use(express.json());
-app.use(cors());
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight requests
 
 // MongoDB Connection
-const MONGODB_URI = 'mongodb+srv://smartrichads:YSMlbHeg9bgEJBxL@cluster0.puiov.mongodb.net/';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://smartrichads:YSMlbHeg9bgEJBxL@cluster0.puiov.mongodb.net/';
 
 mongoose
   .connect(MONGODB_URI)
@@ -36,6 +48,17 @@ const User = mongoose.model('User', userSchema);
 
 // JWT Secret
 const JWT_SECRET = process.env.JWT_SECRET || 'blacklist-alliance-secret-key';
+
+// Email Transporter Setup
+const createTransporter = () => {
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER || 'smartrichads@gmail.com',
+      pass: process.env.EMAIL_PASS || 'rqtp zuyg xkvn nmym' // App password for Gmail
+    }
+  });
+};
 
 // Schedule scraping every hour
 cron.schedule('0 * * * *', async () => {
@@ -68,9 +91,87 @@ app.get('/api/blacklist-stats', async (req, res) => {
   }
 });
 
-// Routes
+// Contact form endpoint with robust error handling
+app.post('/api/contact', async (req, res) => {
+  try {
+    // Log received request
+    console.log('Received contact form request');
+    
+    const { name, email, subject, message } = req.body;
+    
+    // Validate input
+    if (!name || !email || !subject || !message) {
+      console.log('Validation failed: Missing required fields');
+      return res.status(400).json({ message: 'All fields are required' });
+    }
+    
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      console.log('Validation failed: Invalid email format');
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+    
+    console.log('Sending contact form email from:', email);
+    
+    // Create the transporter
+    const transporter = createTransporter();
+    
+    // Verify transporter configuration
+    try {
+      await transporter.verify();
+      console.log('Transporter verified successfully');
+    } catch (verifyError) {
+      console.error('Transporter verification failed:', verifyError);
+      return res.status(500).json({ 
+        message: 'Email configuration error', 
+        error: verifyError.message
+      });
+    }
+    
+    // Email options with more secure configuration
+    const mailOptions = {
+      from: `"Blacklist Alliance" <${process.env.EMAIL_USER || 'smartrichads@gmail.com'}>`,
+      to: process.env.CONTACT_EMAIL || 'smartrichads@gmail.com',
+      replyTo: email,
+      subject: `[Blacklist Alliance Contact] ${subject}`,
+      html: `
+        <h2>New Contact Form Submission</h2>
+        <p><strong>From:</strong> ${name} (${email})</p>
+        <p><strong>Subject:</strong> ${subject}</p>
+        <h3>Message:</h3>
+        <p>${message.replace(/\n/g, '<br>')}</p>
+        <hr>
+        <p><small>This email was sent from the Blacklist Alliance contact form on ${new Date().toLocaleString()}.</small></p>
+      `
+    };
+    
+    // Send email with explicit error handling
+    try {
+      const info = await transporter.sendMail(mailOptions);
+      console.log('Email sent successfully. Message ID:', info.messageId);
+      return res.status(200).json({ 
+        message: 'Email sent successfully', 
+        messageId: info.messageId 
+      });
+    } catch (sendError) {
+      console.error('Failed to send email:', sendError);
+      return res.status(500).json({ 
+        message: 'Failed to send email', 
+        error: sendError.message 
+      });
+    }
+  } catch (error) {
+    console.error('Unexpected error in contact endpoint:', error);
+    return res.status(500).json({ 
+      message: 'Server error processing contact form', 
+      error: error.message 
+    });
+  }
+});
+
 // Register new user
-app.post('/api/api/signup', async (req, res) => {
+app.post('/api/api//signup', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 

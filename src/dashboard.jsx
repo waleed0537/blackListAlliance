@@ -1,5 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import './styles/dashboard.css';
+import axios from 'axios';
+        
 import {
     FaHome,
     FaCog,
@@ -16,7 +18,17 @@ import {
     FaChevronUp,
     FaEnvelope,
     FaSignOutAlt,
-    FaSync
+    FaSync,
+    FaPaperPlane,
+    FaCheckCircle,
+    FaClock,
+    FaMapMarkerAlt,
+    FaTwitter,
+    FaFacebookF,
+    FaLinkedinIn,
+    FaBuilding,
+    FaBriefcase,
+    FaMapMarked
 } from 'react-icons/fa';
 import FileUploader from './FileUploader';
 import AuthContext from './AuthContext';
@@ -54,6 +66,123 @@ const Dashboard = () => {
     const [isRefreshingStats, setIsRefreshingStats] = useState(false);
     const apiKey = "Pkcka4f2BbdHh2FhzJtx";
 
+    // Contact form states
+    const [showContactForm, setShowContactForm] = useState(false);
+    const [contactName, setContactName] = useState('');
+    const [contactEmail, setContactEmail] = useState('');
+    const [contactSubject, setContactSubject] = useState('');
+    const [contactMessage, setContactMessage] = useState('');
+    const [contactSubmitting, setContactSubmitting] = useState(false);
+    const [contactSuccess, setContactSuccess] = useState(false);
+    const [contactError, setContactError] = useState(null);
+
+    // Function to handle opening the contact form
+    const openContactForm = () => {
+        setShowContactForm(true);
+        // Pre-fill the email if user is logged in
+        if (user && user.email) {
+            setContactEmail(user.email);
+        }
+        // Pre-fill the name if user is logged in
+        if (user && user.name) {
+            setContactName(user.name);
+        }
+    };
+
+    // Function to handle closing the contact form
+    const closeContactForm = () => {
+        setShowContactForm(false);
+        // Reset form state
+        setContactSuccess(false);
+        setContactError(null);
+    };
+
+    // Function to handle contact form submission
+    // Function to handle contact form submission
+// Updated handleContactSubmit function for dashboard.jsx
+const handleContactSubmit = async (e) => {
+    e.preventDefault();
+    
+    // Validate form fields
+    if (!contactName || !contactEmail || !contactSubject || !contactMessage) {
+        setContactError("All fields are required");
+        return;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(contactEmail)) {
+        setContactError("Please enter a valid email address");
+        return;
+    }
+
+    // Set loading state
+    setContactSubmitting(true);
+    setContactError(null);
+
+    try {
+        // Contact form data
+        const contactData = {
+            name: contactName,
+            email: contactEmail,
+            subject: contactSubject,
+            message: contactMessage
+        };
+
+        console.log('Sending contact form data:', contactData);
+
+        // Use axios instead of fetch for better error handling
+        
+        try {
+            const response = await axios.post('http://localhost:5000/api/contact', contactData, {
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            console.log('Email sent successfully:', response.data);
+            
+            // Set success state
+            setContactSubmitting(false);
+            setContactSuccess(true);
+            
+            // Reset form after a delay
+            setTimeout(() => {
+                setContactName('');
+                setContactEmail('');
+                setContactSubject('');
+                setContactMessage('');
+            }, 3000);
+            
+        } catch (axiosError) {
+            console.error('Axios error:', axiosError);
+            
+            let errorMessage = 'Failed to send message. Please try again later.';
+            
+            if (axiosError.response) {
+                // The request was made and the server responded with a status code
+                // that falls out of the range of 2xx
+                console.error('Response data:', axiosError.response.data);
+                console.error('Response status:', axiosError.response.status);
+                
+                errorMessage = axiosError.response.data.message || errorMessage;
+            } else if (axiosError.request) {
+                // The request was made but no response was received
+                console.error('No response received:', axiosError.request);
+                errorMessage = 'No response from server. Please check your connection.';
+            }
+            
+            setContactSubmitting(false);
+            setContactError(errorMessage);
+        }
+        
+    } catch (error) {
+        console.error('Error sending contact form:', error);
+        setContactSubmitting(false);
+        setContactError('Failed to send message. Please try again later.');
+    }
+};
+
     // Function to manually refresh blacklist data
     const handleRefreshBlacklistData = async () => {
         setIsRefreshingStats(true);
@@ -65,6 +194,7 @@ const Dashboard = () => {
             setIsRefreshingStats(false);
         }
     };
+    
     const handleNumberUploadComplete = (data) => {
         console.log('Number scrub completed:', data);
         // You can add any additional handling here
@@ -359,6 +489,10 @@ const Dashboard = () => {
                                 <FaCog />
                                 <span>DNC Version Certification</span>
                             </li>
+                            <li className="nav-item" onClick={openContactForm}>
+                                <FaEnvelope />
+                                <span>Contact Us</span>
+                            </li>
                         </ul>
                     </nav>
                 </aside>
@@ -463,6 +597,7 @@ const Dashboard = () => {
                                         )}
                                     </div>
 
+                                    {/* Other accordion sections remain the same */}
                                     <div className="accordion-section">
                                         <div className="accordion-header" onClick={toggleEmailCheck}>
                                             <h4>Blacklisted Email Check</h4>
@@ -604,20 +739,6 @@ const Dashboard = () => {
                                             </div>
                                         )}
                                     </div>
-
-                                    <div className="accordion-section upload-section">
-                                        <div className="upload-header">
-                                            <h4>Upload Internal Suppression/DNC File</h4>
-                                            <span className="upload-note">(single-column csv or txt files only)</span>
-                                        </div>
-                                        <FileUploader
-                                            fileType="suppression"
-                                            apiKey={apiKey}
-                                            onUploadComplete={(data) => console.log('Suppression file uploaded:', data)}
-                                        />
-                                    </div>
-
-
                                 </div>
                             </div>
                         </div>
@@ -721,6 +842,24 @@ const Dashboard = () => {
                                     </button>
                                 </div>
 
+                                {/* Contact Us Card - NEW */}
+                                <div className="card">
+                                    <div className="card-content">
+                                        <div className="card-icon">
+                                            <div className="icon-bg contact">
+                                                <FaEnvelope />
+                                            </div>
+                                        </div>
+                                        <div className="card-details">
+                                            <h3>CONTACT US</h3>
+                                            <p>Have questions or feedback? Reach out to our support team</p>
+                                        </div>
+                                    </div>
+                                    <button className="card-action" onClick={openContactForm}>
+                                        Contact Support <FaArrowRight />
+                                    </button>
+                                </div>
+
                                 {/* Account Card */}
                                 <div className="card">
                                     <div className="card-content">
@@ -817,10 +956,151 @@ const Dashboard = () => {
                         </>
                     )}
                     <footer className="dashboard-footer">
-                        <p>©2025 The Blacklist Alliance Ltd. All Rights Reserved.</p>
+                        <div className="footer-content">
+                            <div className="footer-company">
+                                <div className="footer-logo">
+                                    <p><FaBuilding className="footer-icon" /> THE BLACKLIST<span>ALLIANCE</span></p>
+                                    <p><FaBriefcase className="footer-icon" /> A division of MARS Advertising LLC</p>
+                                </div>
+                                <div className="footer-address">
+                                    <p><FaMapMarkerAlt className="footer-icon" /> 1250 Broadway, 36th Floor</p>
+                                    <p><FaMapMarked className="footer-icon" /> New York, NY 10001, United States</p>
+                                </div>
+                            </div>
+                            
+                            <div className="footer-contact">
+                                <p><FaPhoneAlt className="footer-icon" /> +1 (212) 555-8765</p>
+                                <p><FaEnvelope className="footer-icon" /> support@blacklistalliance.com</p>
+                                <p><FaClock className="footer-icon" /> Mon-Fri: 9:00 AM - 5:00 PM EST</p>
+                                <div className="footer-social">
+                                    <a href="#" className="social-icon"><FaTwitter /></a>
+                                    <a href="#" className="social-icon"><FaFacebookF /></a>
+                                    <a href="#" className="social-icon"><FaLinkedinIn /></a>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div className="footer-bottom">
+                            <p className="footer-copyright">©2025 The Blacklist Alliance Ltd. All Rights Reserved. A US-based company.</p>
+                        </div>
                     </footer>
                 </main>
             </div>
+
+            {/* Contact Form Modal */}
+            {showContactForm && (
+                <div className="modal-overlay" onClick={closeContactForm}>
+                    <div className="modal-content contact-form-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Contact Support</h2>
+                            <button className="modal-close" onClick={closeContactForm}>
+                                <FaTimes />
+                            </button>
+                        </div>
+                        
+                        {contactSuccess ? (
+                            <div className="modal-body">
+                                <div className="success-container">
+                                    <FaCheckCircle className="success-icon" />
+                                    <h3>Message Sent!</h3>
+                                    <p>Thank you for contacting us. We've received your message and will respond shortly.</p>
+                                    <button className="primary-button" onClick={closeContactForm}>
+                                        Close
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="modal-body">
+                                {contactError && (
+                                    <div className="error-message">
+                                        <p>{contactError}</p>
+                                    </div>
+                                )}
+                                
+                                <form className="contact-form" onSubmit={handleContactSubmit}>
+                                    <div className="form-group">
+                                        <label htmlFor="contactName">Full Name</label>
+                                        <input
+                                            type="text"
+                                            id="contactName"
+                                            className="form-control"
+                                            placeholder="Your Name"
+                                            value={contactName}
+                                            onChange={(e) => setContactName(e.target.value)}
+                                            disabled={contactSubmitting}
+                                        />
+                                    </div>
+                                    
+                                    <div className="form-group">
+                                        <label htmlFor="contactEmail">Email Address</label>
+                                        <input
+                                            type="email"
+                                            id="contactEmail"
+                                            className="form-control"
+                                            placeholder="your@email.com"
+                                            value={contactEmail}
+                                            onChange={(e) => setContactEmail(e.target.value)}
+                                            disabled={contactSubmitting}
+                                        />
+                                    </div>
+                                    
+                                    <div className="form-group">
+                                        <label htmlFor="contactSubject">Subject</label>
+                                        <input
+                                            type="text"
+                                            id="contactSubject"
+                                            className="form-control"
+                                            placeholder="What is this regarding?"
+                                            value={contactSubject}
+                                            onChange={(e) => setContactSubject(e.target.value)}
+                                            disabled={contactSubmitting}
+                                        />
+                                    </div>
+                                    
+                                    <div className="form-group">
+                                        <label htmlFor="contactMessage">Message</label>
+                                        <textarea
+                                            id="contactMessage"
+                                            className="form-control"
+                                            placeholder="Type your message here..."
+                                            rows="5"
+                                            value={contactMessage}
+                                            onChange={(e) => setContactMessage(e.target.value)}
+                                            disabled={contactSubmitting}
+                                        ></textarea>
+                                    </div>
+                                    
+                                    <div className="button-group">
+                                        <button 
+                                            type="submit" 
+                                            className="primary-button"
+                                            disabled={contactSubmitting}
+                                        >
+                                            {contactSubmitting ? (
+                                                <>
+                                                    <FaSync className="spinning" /> Sending...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FaPaperPlane /> Send Message
+                                                </>
+                                            )}
+                                        </button>
+                                        <button 
+                                            type="button" 
+                                            className="secondary-button"
+                                            onClick={closeContactForm}
+                                            disabled={contactSubmitting}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
