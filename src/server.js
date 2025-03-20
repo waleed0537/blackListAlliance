@@ -1,4 +1,4 @@
-// server.js - Corrected and Complete Version
+// server.js - Production-ready version
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -8,15 +8,23 @@ const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
 const { getBlacklistData } = require('./scrapper'); // Make sure path is correct
 const cron = require('node-cron');
+const path = require('path');
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 
-// Improved CORS configuration
+// CORS configuration - Update with your production domain
 const corsOptions = {
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:4000'],
+  origin: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'http://localhost:4000',
+    'https://thedncalliance.com',
+    'https://www.thedncalliance.com',
+    'https://dncalliance.onrender.com'
+  ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token', 'Accept'],
   credentials: true,
@@ -30,7 +38,10 @@ app.options('*', cors(corsOptions)); // Handle preflight requests
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://smartrichads:YSMlbHeg9bgEJBxL@cluster0.puiov.mongodb.net/';
-
+app.use(express.static(path.join(__dirname, 'dist')));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 mongoose
   .connect(MONGODB_URI)
   .then(() => console.log('MongoDB connected successfully'))
@@ -46,7 +57,7 @@ const userSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 
-// JWT Secret
+// JWT Secret - Use a more secure secret in production
 const JWT_SECRET = process.env.JWT_SECRET || 'blacklist-alliance-secret-key';
 
 // Email Transporter Setup
@@ -117,19 +128,7 @@ app.post('/api/contact', async (req, res) => {
     // Create the transporter
     const transporter = createTransporter();
     
-    // Verify transporter configuration
-    try {
-      await transporter.verify();
-      console.log('Transporter verified successfully');
-    } catch (verifyError) {
-      console.error('Transporter verification failed:', verifyError);
-      return res.status(500).json({ 
-        message: 'Email configuration error', 
-        error: verifyError.message
-      });
-    }
-    
-    // Email options with more secure configuration
+    // Email options
     const mailOptions = {
       from: `"DNC Alliance" <${process.env.EMAIL_USER || 'smartrichads@gmail.com'}>`,
       to: process.env.CONTACT_EMAIL || 'smartrichads@gmail.com',
@@ -146,7 +145,7 @@ app.post('/api/contact', async (req, res) => {
       `
     };
     
-    // Send email with explicit error handling
+    // Send email with error handling
     try {
       const info = await transporter.sendMail(mailOptions);
       console.log('Email sent successfully. Message ID:', info.messageId);
@@ -170,8 +169,9 @@ app.post('/api/contact', async (req, res) => {
   }
 });
 
-// Register new user
-app.post('/api/api//signup', async (req, res) => {
+// Authentication routes
+// Fixed the routes to remove duplicated /api
+app.post('/api/signup', async (req, res) => {
   try {
     const { name, email, password } = req.body;
 
@@ -211,8 +211,8 @@ app.post('/api/api//signup', async (req, res) => {
   }
 });
 
-// Login user
-app.post('/api/api/login', async (req, res) => {
+// Login user - fixed duplicate /api
+app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -245,8 +245,8 @@ app.post('/api/api/login', async (req, res) => {
   }
 });
 
-// Protected route example
-app.get('/api/api/user', async (req, res) => {
+// Protected route example - fixed duplicate /api
+app.get('/api/user', async (req, res) => {
   try {
     const token = req.header('x-auth-token');
     
@@ -271,8 +271,7 @@ app.get('/api/api/user', async (req, res) => {
   }
 });
 
-// To explicitly bind to 0.0.0.0 (all network interfaces):
-const PORT = process.env.PORT || 5000;
+// Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on http://0.0.0.0:${PORT}`);
+  console.log(`Frontend server running on http://0.0.0.0:${PORT}`);
 });
