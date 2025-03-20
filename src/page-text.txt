@@ -36,4 +36,4 @@ NUMBER VERIFIER
 Identify Caller IDs wrongly tagged as spam by carrier algorithms, manage Caller IDs in real time, increase answer rates and boost conversions.
 Create New Account
 Access Number Verifier
-©2025 The Blacklist Alliance Ltd. All Rights Reserved.
+©2025 The DNC Alliance Ltd. All Rights Reserved.

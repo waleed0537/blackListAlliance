@@ -131,10 +131,10 @@ app.post('/api/contact', async (req, res) => {
     
     // Email options with more secure configuration
     const mailOptions = {
-      from: `"Blacklist Alliance" <${process.env.EMAIL_USER || 'smartrichads@gmail.com'}>`,
+      from: `"DNC Alliance" <${process.env.EMAIL_USER || 'smartrichads@gmail.com'}>`,
       to: process.env.CONTACT_EMAIL || 'smartrichads@gmail.com',
       replyTo: email,
-      subject: `[Blacklist Alliance Contact] ${subject}`,
+      subject: `[DNC Alliance Contact] ${subject}`,
       html: `
         <h2>New Contact Form Submission</h2>
         <p><strong>From:</strong> ${name} (${email})</p>
@@ -142,7 +142,7 @@ app.post('/api/contact', async (req, res) => {
         <h3>Message:</h3>
         <p>${message.replace(/\n/g, '<br>')}</p>
         <hr>
-        <p><small>This email was sent from the Blacklist Alliance contact form on ${new Date().toLocaleString()}.</small></p>
+        <p><small>This email was sent from the DNC Alliance contact form on ${new Date().toLocaleString()}.</small></p>
       `
     };
     

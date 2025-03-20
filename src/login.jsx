@@ -34,7 +34,7 @@ const Login = ({ onNavigateToSignup }) => {
         <div className="auth-container">
             <div className="auth-card">
                 <div className="auth-header">
-                    <h1 className="auth-logo">THE BLACKLIST<span>ALLIANCE</span></h1>
+                    <h1 className="auth-logo">THE DNC<span>ALLIANCE</span></h1>
                     <p>- (MARS Advertising LLC)</p>
                 </div>
                 

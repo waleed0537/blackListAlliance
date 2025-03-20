@@ -21,7 +21,7 @@ async function sendContactFormEmail(data) {
   try {
     // Setup email data
     const mailOptions = {
-      from: 'The Blacklist Alliance <smartrichads@gmail.com>', // sender address
+      from: 'The DNC Alliance <smartrichads@gmail.com>', // sender address
       to: 'smartrichads@gmail.com', // recipient address
       replyTo: email,
       subject: `Contact Form: ${subject}`,
@@ -40,7 +40,7 @@ async function sendContactFormEmail(data) {
           </div>
           <hr style="border: 1px solid #eee;">
           <p style="color: #777; font-size: 12px;">
-            This email was sent from the contact form on The Blacklist Alliance dashboard.
+            This email was sent from the contact form on The DNC Alliance dashboard.
           </p>
         </div>
       `

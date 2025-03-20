@@ -424,7 +424,7 @@ const handleContactSubmit = async (e) => {
                         <FaBars />
                     </button>
                     <div className="logo">
-                        <h1>THE BLACKLIST<span>ALLIANCE</span></h1>
+                        <h1>THE DNC<span>ALLIANCE</span></h1>
                         <p>- (MARS Advertising LLC)</p>
                     </div>
                 </div>
@@ -468,7 +468,7 @@ const handleContactSubmit = async (e) => {
                                 {functionsOpen && (
                                     <ul className="submenu">
                                         <li>Edit Account</li>
-                                        <li>Blacklist Academy</li>
+                                        <li>DNC Academy</li>
                                         <li>Legal Support</li>
                                         <li className={showFirewall ? 'active' : ''}>Litigation Firewall</li>
                                         <li>Number Evaluation Engine</li>
@@ -606,7 +606,7 @@ const handleContactSubmit = async (e) => {
 
                                         {emailCheckOpen && (
                                             <div className="accordion-content">
-                                                <p>Check an email address against the Blacklist Database. You can enter an email or MD5 hashed address.</p>
+                                                <p>Check an email address against the DNC Database. You can enter an email or MD5 hashed address.</p>
                                                 <div className="input-group">
                                                     <input
                                                         type="email"
@@ -730,7 +730,7 @@ const handleContactSubmit = async (e) => {
 
                                         {scrubEmailOpen && (
                                             <div className="accordion-content">
-                                                <p>Upload a CSV file with email addresses to scrub against the Blacklist Database.</p>
+                                                <p>Upload a CSV file with email addresses to scrub against the DNC Database.</p>
                                                 <FileUploader
                                                     fileType="email"
                                                     apiKey={apiKey}
@@ -907,12 +907,12 @@ const handleContactSubmit = async (e) => {
                                             </div>
                                         </div>
                                         <div className="card-details">
-                                            <h3>BLACKLIST ACADEMY LOGIN</h3>
+                                            <h3>DNC ACADEMY LOGIN</h3>
                                             <p>Take online classes and access legal and compliance resources</p>
                                         </div>
                                     </div>
                                     <button className="card-action">
-                                        Login To Blacklist Academy <FaArrowRight />
+                                        Login To DNC Academy <FaArrowRight />
                                     </button>
                                 </div>
 
@@ -959,7 +959,7 @@ const handleContactSubmit = async (e) => {
                         <div className="footer-content">
                             <div className="footer-company">
                                 <div className="footer-logo">
-                                    <p><FaBuilding className="footer-icon" /> THE BLACKLIST<span>ALLIANCE</span></p>
+                                    <p><FaBuilding className="footer-icon" /> THE DNC<span>ALLIANCE</span></p>
                                     <p><FaBriefcase className="footer-icon" /> A division of MARS Advertising LLC</p>
                                 </div>
                                 <div className="footer-address">
@@ -970,7 +970,7 @@ const handleContactSubmit = async (e) => {
                             
                             <div className="footer-contact">
                                 <p><FaPhoneAlt className="footer-icon" /> +1 (212) 555-8765</p>
-                                <p><FaEnvelope className="footer-icon" /> support@blacklistalliance.com</p>
+                                <p><FaEnvelope className="footer-icon" /> support@dncalliance.com</p>
                                 <p><FaClock className="footer-icon" /> Mon-Fri: 9:00 AM - 5:00 PM EST</p>
                                 <div className="footer-social">
                                     <a href="#" className="social-icon"><FaTwitter /></a>
@@ -981,7 +981,7 @@ const handleContactSubmit = async (e) => {
                         </div>
                         
                         <div className="footer-bottom">
-                            <p className="footer-copyright">©2025 The Blacklist Alliance Ltd. All Rights Reserved. A US-based company.</p>
+                            <p className="footer-copyright">©2025 The DNC Alliance Ltd. All Rights Reserved. A US-based company.</p>
                         </div>
                     </footer>
                 </main>
