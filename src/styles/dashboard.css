@@ -1937,3 +1937,98 @@ details pre {
     justify-content: center;
   }
 }
+/* Add this to your dashboard.css file */
+
+.welcome-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.action-button {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s;
+}
+
+.billing-button {
+  background: #3498db;
+  color: white;
+}
+
+.billing-button:hover {
+  background: #2980b9;
+}
+
+/* Modal styles for upgrade confirmation */
+.upgrade-modal {
+  max-width: 550px;
+}
+
+.modal-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.info-icon {
+  color: #3498db;
+  font-size: 1.5rem;
+  margin-right: 15px;
+}
+
+.confirmation-message {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.upgrade-details {
+  margin-bottom: 20px;
+}
+
+.upgrade-details ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.upgrade-details li {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.check-icon {
+  color: #2ecc71;
+  margin-right: 10px;
+}
+
+.confirmation-summary {
+  background-color: #f8f9fa;
+  padding: 15px;
+  border-radius: 6px;
+  margin-bottom: 20px;
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.summary-row.total {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eaeaea;
+  font-weight: 600;
+}
+
+.crossed-out {
+  text-decoration: line-through;
+  color: #e74c3c;
+}

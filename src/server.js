@@ -9,6 +9,7 @@ const nodemailer = require('nodemailer');
 const { getBlacklistData } = require('./scrapper'); // Make sure path is correct
 const cron = require('node-cron');
 const path = require('path');
+const axios = require('axios');
 
 // Load environment variables
 dotenv.config();
@@ -265,6 +266,41 @@ app.get('/api/user', async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(401).json({ message: 'Token is not valid' });
+  }
+});
+// Add this to your server.js
+app.post('/api/email-lookup', async (req, res) => {
+  try {
+    const { email, apiKey } = req.body;
+    
+    console.log(`Proxying email lookup request for: ${email}`);
+    
+    // Forward the request to the BlackList Alliance API with the correct format
+    const response = await axios.post(
+      `https://api.blacklistalliance.net/emailbulk?key=${apiKey}`,
+      { emails: [email] },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      }
+    );
+    
+    console.log('Email lookup successful');
+    res.json(response.data);
+  } catch (error) {
+    console.error('Error with email lookup:', error);
+    
+    if (error.response) {
+      // Forward the API error response
+      res.status(error.response.status).json(error.response.data);
+    } else {
+      res.status(500).json({ 
+        message: 'Email lookup failed', 
+        error: error.message 
+      });
+    }
   }
 });
 

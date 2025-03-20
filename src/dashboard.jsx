@@ -1,5 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react';
 import './styles/dashboard.css';
+import './styles/pricing.css';
 import axios from 'axios';
         
 import {
@@ -28,7 +29,8 @@ import {
     FaLinkedinIn,
     FaBuilding,
     FaBriefcase,
-    FaMapMarked
+    FaMapMarked,
+    FaInfoCircle
 } from 'react-icons/fa';
 import FileUploader from './FileUploader';
 import AuthContext from './AuthContext';
@@ -57,6 +59,7 @@ const Dashboard = () => {
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showFirewall, setShowFirewall] = useState(false);
+    const [showPricing, setShowPricing] = useState(false);
     const [numberResult, setNumberResult] = useState(null);
     const [emailResult, setEmailResult] = useState(null);
     const [numberError, setNumberError] = useState(null);
@@ -75,6 +78,9 @@ const Dashboard = () => {
     const [contactSubmitting, setContactSubmitting] = useState(false);
     const [contactSuccess, setContactSuccess] = useState(false);
     const [contactError, setContactError] = useState(null);
+
+    // Pricing plan states
+    const [showUpgradeConfirm, setShowUpgradeConfirm] = useState(false);
 
     // Function to handle opening the contact form
     const openContactForm = () => {
@@ -97,91 +103,110 @@ const Dashboard = () => {
         setContactError(null);
     };
 
-    // Function to handle contact form submission
-    // Function to handle contact form submission
-// Updated handleContactSubmit function for dashboard.jsx
-const handleContactSubmit = async (e) => {
-    e.preventDefault();
+    // Function to toggle pricing section visibility
+    const togglePricing = () => {
+        setShowPricing(!showPricing);
+    };
+
+    // Functions for plan upgrade
+    const handleUpgradeClick = () => {
+        setShowUpgradeConfirm(true);
+    };
     
-    // Validate form fields
-    if (!contactName || !contactEmail || !contactSubject || !contactMessage) {
-        setContactError("All fields are required");
-        return;
-    }
+    const closeUpgradeModal = () => {
+        setShowUpgradeConfirm(false);
+    };
+    
+    const confirmUpgrade = () => {
+        // Here you would implement the actual upgrade logic
+        // For now, just close the modal and show a success message
+        alert('Upgrade request submitted successfully!');
+        setShowUpgradeConfirm(false);
+    };
 
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(contactEmail)) {
-        setContactError("Please enter a valid email address");
-        return;
-    }
-
-    // Set loading state
-    setContactSubmitting(true);
-    setContactError(null);
-
-    try {
-        // Contact form data
-        const contactData = {
-            name: contactName,
-            email: contactEmail,
-            subject: contactSubject,
-            message: contactMessage
-        };
-
-        console.log('Sending contact form data:', contactData);
-
-        // Use axios instead of fetch for better error handling
+    // Function to handle contact form submission
+    const handleContactSubmit = async (e) => {
+        e.preventDefault();
         
+        // Validate form fields
+        if (!contactName || !contactEmail || !contactSubject || !contactMessage) {
+            setContactError("All fields are required");
+            return;
+        }
+
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(contactEmail)) {
+            setContactError("Please enter a valid email address");
+            return;
+        }
+
+        // Set loading state
+        setContactSubmitting(true);
+        setContactError(null);
+
         try {
-            const response = await axios.post('http://localhost:5000/api/contact', contactData, {
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            });
+            // Contact form data
+            const contactData = {
+                name: contactName,
+                email: contactEmail,
+                subject: contactSubject,
+                message: contactMessage
+            };
+
+            console.log('Sending contact form data:', contactData);
+
+            // Use axios instead of fetch for better error handling
             
-            console.log('Email sent successfully:', response.data);
-            
-            // Set success state
-            setContactSubmitting(false);
-            setContactSuccess(true);
-            
-            // Reset form after a delay
-            setTimeout(() => {
-                setContactName('');
-                setContactEmail('');
-                setContactSubject('');
-                setContactMessage('');
-            }, 3000);
-            
-        } catch (axiosError) {
-            console.error('Axios error:', axiosError);
-            
-            let errorMessage = 'Failed to send message. Please try again later.';
-            
-            if (axiosError.response) {
-                // The request was made and the server responded with a status code
-                // that falls out of the range of 2xx
-                console.error('Response data:', axiosError.response.data);
-                console.error('Response status:', axiosError.response.status);
+            try {
+                const response = await axios.post('http://localhost:5000/api/contact', contactData, {
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
                 
-                errorMessage = axiosError.response.data.message || errorMessage;
-            } else if (axiosError.request) {
-                // The request was made but no response was received
-                console.error('No response received:', axiosError.request);
-                errorMessage = 'No response from server. Please check your connection.';
+                console.log('Email sent successfully:', response.data);
+                
+                // Set success state
+                setContactSubmitting(false);
+                setContactSuccess(true);
+                
+                // Reset form after a delay
+                setTimeout(() => {
+                    setContactName('');
+                    setContactEmail('');
+                    setContactSubject('');
+                    setContactMessage('');
+                }, 3000);
+                
+            } catch (axiosError) {
+                console.error('Axios error:', axiosError);
+                
+                let errorMessage = 'Failed to send message. Please try again later.';
+                
+                if (axiosError.response) {
+                    // The request was made and the server responded with a status code
+                    // that falls out of the range of 2xx
+                    console.error('Response data:', axiosError.response.data);
+                    console.error('Response status:', axiosError.response.status);
+                    
+                    errorMessage = axiosError.response.data.message || errorMessage;
+                } else if (axiosError.request) {
+                    // The request was made but no response was received
+                    console.error('No response received:', axiosError.request);
+                    errorMessage = 'No response from server. Please check your connection.';
+                }
+                
+                setContactSubmitting(false);
+                setContactError(errorMessage);
             }
             
+        } catch (error) {
+            console.error('Error sending contact form:', error);
             setContactSubmitting(false);
-            setContactError(errorMessage);
+            setContactError('Failed to send message. Please try again later.');
         }
-        
-    } catch (error) {
-        console.error('Error sending contact form:', error);
-        setContactSubmitting(false);
-        setContactError('Failed to send message. Please try again later.');
-    }
-};
+    };
 
     // Function to manually refresh blacklist data
     const handleRefreshBlacklistData = async () => {
@@ -333,76 +358,61 @@ const handleContactSubmit = async (e) => {
         // Trim and validate email
         const trimmedEmail = email.trim().toLowerCase();
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
+    
         if (!trimmedEmail) {
             setEmailError("Please enter an email address");
             return;
         }
-
+    
         if (!emailRegex.test(trimmedEmail)) {
             setEmailError("Please enter a valid email address");
             return;
         }
-
+    
         setEmailResult(null);
         setEmailError(null);
         setEmailLoading(true);
-
-        // Use Vite proxy configuration
-        const apiUrl = `/api/emailbulk?key=${apiKey}`;
-
-        const options = {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({
-                emails: [trimmedEmail]
-            })
-        };
-
-        fetch(apiUrl, options)
-            .then(async (res) => {
-                const contentType = res.headers.get('content-type');
-
-                // Handle non-JSON responses
-                if (!contentType?.includes('application/json')) {
-                    const text = await res.text();
-                    console.error('Non-JSON response:', text);
-                    throw new Error('Server returned unexpected format');
-                }
-
-                const data = await res.json();
-
-                if (!res.ok) {
-                    console.error('API error response:', data);
-                    throw new Error(data.message || `HTTP error ${res.status}`);
-                }
-
-                // Handle array response
-                const result = Array.isArray(data) ? data[0] : data;
-
-                return {
-                    match: result.status === 0,
-                    lists: result.lists || [],
-                    formatted: trimmedEmail,
-                    rawResponse: result
-                };
-            })
-            .then(formattedResult => {
-                setEmailResult(formattedResult);
-                setEmailLoading(false);
-            })
-            .catch(err => {
-                console.error('Email API Error:', err);
-                setEmailError(err.message.includes('unexpected format')
-                    ? 'Service temporarily unavailable. Please try again later.'
-                    : err.message);
-                setEmailLoading(false);
-            });
+    
+        // Use the full URL to your server
+        const serverUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+        
+        axios.post(`${serverUrl}/api/email-lookup`, {
+            email: trimmedEmail,
+            apiKey: apiKey
+        })
+        .then(response => {
+            console.log('Email lookup response:', response.data);
+            
+            // Handle array response
+            const data = response.data;
+            const result = Array.isArray(data) ? data[0] : data;
+            
+            return {
+                match: result.status === 0, // Assuming 0 means match, adjust based on API docs
+                lists: result.lists || [],
+                formatted: trimmedEmail,
+                rawResponse: result
+            };
+        })
+        .then(formattedResult => {
+            setEmailResult(formattedResult);
+            setEmailLoading(false);
+        })
+        .catch(err => {
+            console.error('Email API Error:', err);
+            let errorMessage = 'Service temporarily unavailable. Please try again later.';
+            
+            if (err.response && err.response.data) {
+                errorMessage = err.response.data.message || errorMessage;
+            } else if (err.message) {
+                errorMessage = err.message;
+            }
+            
+            setEmailError(errorMessage);
+            setEmailLoading(false);
+        });
     };
-
+    
     const clearPhone = () => {
         setPhoneNumber('');
         setNumberResult(null);
@@ -414,7 +424,6 @@ const handleContactSubmit = async (e) => {
         setEmailResult(null);
         setEmailError(null);
     };
-
     return (
         <div className="dashboard-container">
             {/* Header */}
@@ -745,7 +754,132 @@ const handleContactSubmit = async (e) => {
                     ) : (
                         <>
                             <div className="welcome-section">
-                                <h2>Hello {user?.name || 'MARS Advertising LLC'},</h2>
+                                <div className="welcome-header">
+                                    <h2>Hello {user?.name || 'MARS Advertising LLC'},</h2>
+                                    <button 
+                                        className="action-button billing-button" 
+                                        onClick={togglePricing}
+                                    >
+                                        {showPricing ? 'Hide Account & Billing' : 'View Account & Billing'}
+                                    </button>
+                                </div>
+                                
+                                {/* Display pricing section when showPricing is true */}
+                                {showPricing && (
+                                    <div className="pricing-section">
+                                        <h2 className="section-title">Account &amp; Billing</h2>
+                                        
+                                        <div className="pricing-overview">
+                                            <div className="pricing-card current-plan">
+                                                <div className="pricing-header">
+                                                    <h3>Current Blacklist Plan:</h3>
+                                                    <div className="plan-name">Enterprise - $2,500 - 30 MM</div>
+                                                    
+                                                    <div className="plan-details">
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Current Scrub Limit:</span>
+                                                            <span className="detail-value">35,000,000</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Scrub Usage:</span>
+                                                            <span className="detail-value highlight">100,383,237</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Renew Date:</span>
+                                                            <span className="detail-value">1st</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="pricing-footer">
+                                                    <div className="current-cycle">
+                                                        <h4>Current Cycle</h4>
+                                                        <div className="price">$500.00</div>
+                                                        <div className="prev-cycles">Prev Cycles</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="pricing-card usage-summary">
+                                                <div className="usage-row header">
+                                                    <div className="usage-cell">Usage Cycle</div>
+                                                    <div className="usage-cell">Scrub Usage</div>
+                                                    <div className="usage-cell">Overage Amt</div>
+                                                    <div className="usage-cell">Overage Cost:</div>
+                                                </div>
+                                                
+                                                <div className="usage-row">
+                                                    <div className="usage-cell"></div>
+                                                    <div className="usage-cell highlight-blue">100,383,237</div>
+                                                    <div className="usage-cell highlight-red">65,383,237</div>
+                                                    <div className="usage-cell">
+                                                        <div className="cost">$0.0010</div>
+                                                        <div className="waiver-note">(This amount waived with approved upgrade below)</div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="usage-row total">
+                                                    <div className="usage-cell">Total Usage</div>
+                                                    <div className="usage-cell highlight-red">100,383,237</div>
+                                                    <div className="usage-cell highlight-red">65,383,237</div>
+                                                    <div className="usage-cell">
+                                                        <div className="total-cost highlight-red">$65,383.24</div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="upgrade-section">
+                                            <div className="upgrade-header">
+                                                <h3>Plan Needed:</h3>
+                                                <div className="plan-tag">ENT+</div>
+                                                <div className="plan-name">Enterprise Plus - $3,000 - 50MM</div>
+                                                <div className="plan-price">$3,000</div>
+                                            </div>
+                                            
+                                            <div className="special-offer">
+                                                <div className="offer-label">Special Offer:</div>
+                                                <div className="offer-value">125,000,000</div>
+                                                <div className="offer-condition">*with ongoing upgrade approval</div>
+                                            </div>
+                                            
+                                            <div className="plan-description">
+                                                <h4>Upgraded Plan Description</h4>
+                                                <ul className="feature-list">
+                                                    <li><span className="bullet">•</span> Scrub 100mm numbers against the Litigation Firewall</li>
+                                                    <li><span className="bullet">•</span> Litigation monitoring and alerts</li>
+                                                    <li><span className="bullet">•</span> Unlimited attorney consultations</li>
+                                                    <li><span className="bullet">•</span> Five prepaid settlements or compliance reviews per year</li>
+                                                    <li><span className="bullet">•</span> 1000 phone number reputation queries per month</li>
+                                                    <li><span className="bullet">•</span> Fifty logins to the <span className="highlight-feature">Blacklist Academy</span> compliance training and legal resource platform</li>
+                                                </ul>
+                                            </div>
+                                            
+                                            <div className="savings-summary">
+                                                <div className="detail-row">
+                                                    <span className="detail-label">Overage Cost:</span>
+                                                    <span className="detail-value highlight-red">$65,383.24</span>
+                                                </div>
+                                                <div className="detail-row savings">
+                                                    <span className="detail-label">SAVINGS</span>
+                                                    <span className="detail-value highlight-green">$64,883.24</span>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="payment-action">
+                                                <div className="payment-box">
+                                                    <h4>Pay Today:</h4>
+                                                    <div className="price">$500.00</div>
+                                                </div>
+                                                
+                                                <button className="upgrade-button" onClick={handleUpgradeClick}>
+                                                    Upgrade Plan <FaArrowRight />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+                                
                                 <div className="stats-container">
                                     <div className="stat-item">
                                         <div className="stat-header">
@@ -969,8 +1103,7 @@ const handleContactSubmit = async (e) => {
                             </div>
                             
                             <div className="footer-contact">
-                                <p><FaPhoneAlt className="footer-icon" /> +1 (212) 555-8765</p>
-                                <p><FaEnvelope className="footer-icon" /> support@dncalliance.com</p>
+                            <p><FaEnvelope className="footer-icon" /> support@dncalliance.com</p>
                                 <p><FaClock className="footer-icon" /> Mon-Fri: 9:00 AM - 5:00 PM EST</p>
                                 <div className="footer-social">
                                     <a href="#" className="social-icon"><FaTwitter /></a>
@@ -1098,6 +1231,61 @@ const handleContactSubmit = async (e) => {
                                 </form>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+            
+            {/* Upgrade Confirmation Modal */}
+            {showUpgradeConfirm && (
+                <div className="modal-overlay">
+                    <div className="modal-content upgrade-modal">
+                        <div className="modal-header">
+                            <h2>Confirm Plan Upgrade</h2>
+                            <button className="modal-close" onClick={closeUpgradeModal}>×</button>
+                        </div>
+                        
+                        <div className="modal-body">
+                            <div className="confirmation-message">
+                                <FaInfoCircle className="info-icon" />
+                                <p>You are about to upgrade to the <strong>Enterprise Plus</strong> plan for <strong>$3,000</strong> with a one-time payment of <strong>$500.00</strong> today.</p>
+                            </div>
+                            
+                            <div className="upgrade-details">
+                                <h4>Your new plan includes:</h4>
+                                <ul>
+                                    <li><FaCheckCircle className="check-icon" /> 62,500,000 scrubs per month</li>
+                                    <li><FaCheckCircle className="check-icon" /> Litigation monitoring and alerts</li>
+                                    <li><FaCheckCircle className="check-icon" /> Unlimited attorney consultations</li>
+                                    <li><FaCheckCircle className="check-icon" /> Five prepaid settlements/compliance reviews</li>
+                                    <li><FaCheckCircle className="check-icon" /> 1000 monthly reputation queries</li>
+                                    <li><FaCheckCircle className="check-icon" /> 50 Blacklist Academy logins</li>
+                                </ul>
+                            </div>
+                            
+                            <div className="confirmation-summary">
+                                <div className="summary-row">
+                                    <span>Current overage cost:</span>
+                                    <span className="crossed-out">$65,383.24</span>
+                                </div>
+                                <div className="summary-row">
+                                    <span>Today's payment:</span>
+                                    <span>$500.00</span>
+                                </div>
+                                <div className="summary-row total">
+                                    <span>Total savings:</span>
+                                    <span className="highlight-green">$64,883.24</span>
+                                </div>
+                            </div>
+                            
+                            <div className="button-group">
+                                <button className="primary-button" onClick={confirmUpgrade}>
+                                    Confirm Upgrade
+                                </button>
+                                <button className="secondary-button" onClick={closeUpgradeModal}>
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
