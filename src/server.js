@@ -14,6 +14,7 @@ const path = require('path');
 dotenv.config();
 
 const app = express();
+const PORT = process.env.PORT || 5000;
 
 // CORS configuration - Update with your production domain
 const corsOptions = {
@@ -38,10 +39,7 @@ app.options('*', cors(corsOptions)); // Handle preflight requests
 
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://smartrichads:YSMlbHeg9bgEJBxL@cluster0.puiov.mongodb.net/';
-app.use(express.static(path.join(__dirname, 'dist')));
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-});
+
 mongoose
   .connect(MONGODB_URI)
   .then(() => console.log('MongoDB connected successfully'))
@@ -170,7 +168,6 @@ app.post('/api/contact', async (req, res) => {
 });
 
 // Authentication routes
-// Fixed the routes to remove duplicated /api
 app.post('/api/signup', async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -211,7 +208,7 @@ app.post('/api/signup', async (req, res) => {
   }
 });
 
-// Login user - fixed duplicate /api
+// Login user
 app.post('/api/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -245,7 +242,7 @@ app.post('/api/login', async (req, res) => {
   }
 });
 
-// Protected route example - fixed duplicate /api
+// Protected route example
 app.get('/api/user', async (req, res) => {
   try {
     const token = req.header('x-auth-token');
@@ -271,7 +268,16 @@ app.get('/api/user', async (req, res) => {
   }
 });
 
+// Serve static files from the dist directory (for frontend)
+app.use(express.static(path.join(__dirname, 'dist')));
+
+// Handle any requests that don't match the above
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
+
+const PORT = process.env.PORT || 5000;
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Frontend server running on http://0.0.0.0:${PORT}`);
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
