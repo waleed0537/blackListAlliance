@@ -7,21 +7,32 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: process.env.PORT || 5173,
-    proxy: {
-      '/api': {
-        target: process.env.VITE_API_URL || 'https://dncalliance-api.onrender.com',
-        changeOrigin: true,
-        secure: true,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
-        }
-      }
-    }
+    strictPort: true,
+    // Add allowedHosts to fix the blocked request error
+    allowedHosts: [
+      'localhost',
+      'dncalliance.onrender.com',
+      'thedncalliance.com',
+      'www.thedncalliance.com',
+      '.onrender.com'
+    ]
   },
-  resolve: {
-    alias: {
-      '@': '/src'
-    }
+  preview: {
+    host: '0.0.0.0',
+    port: process.env.PORT || 5173,
+    strictPort: true,
+    // Also add allowedHosts to preview server
+    allowedHosts: [
+      'localhost',
+      'dncalliance.onrender.com',
+      'thedncalliance.com',
+      'www.thedncalliance.com',
+      '.onrender.com'
+    ]
+  },
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    emptyOutDir: true
   }
 })
