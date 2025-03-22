@@ -73,7 +73,7 @@ const Login = ({ onNavigateToSignup }) => {
             <div className="auth-card">
                 <div className="auth-header">
                     <h1 className="auth-logo">THE DNC<span>ALLIANCE</span></h1>
-                    <p>- (MARS Advertising LLC)</p>
+       
                 </div>
                 
                 <h2 className="auth-title">Login to Your Account</h2>
