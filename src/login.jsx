@@ -1,7 +1,8 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { FaUserAlt, FaLock, FaArrowRight } from 'react-icons/fa';
 import './styles/auth.css';
 import AuthContext from './AuthContext';
+import axios from 'axios';
 
 const Login = ({ onNavigateToSignup }) => {
     const { login, error: authError } = useContext(AuthContext);
@@ -9,6 +10,43 @@ const Login = ({ onNavigateToSignup }) => {
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [hasInteracted, setHasInteracted] = useState(false);
+
+    // Trigger pre-warming when component mounts
+    useEffect(() => {
+        const preWarmCache = async () => {
+            try {
+                // Get the API URL from environment or use default
+                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                console.log('Pre-warming blacklist data cache on login page load');
+                await axios.get(`${API_URL}/api/pre-warm`);
+            } catch (error) {
+                console.error('Failed to pre-warm cache:', error);
+                // Don't show error to user - this is a background operation
+            }
+        };
+
+        preWarmCache();
+    }, []);
+
+    // Track user interaction with form fields
+    const handleInteraction = () => {
+        if (!hasInteracted) {
+            setHasInteracted(true);
+            
+            // Trigger a more urgent pre-warm when user starts interacting
+            const urgentPreWarm = async () => {
+                try {
+                    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+                    await axios.get(`${API_URL}/api/pre-warm`);
+                } catch (error) {
+                    console.error('Failed to urgently pre-warm cache:', error);
+                }
+            };
+            
+            urgentPreWarm();
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -52,6 +90,7 @@ const Login = ({ onNavigateToSignup }) => {
                                 id="email" 
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
+                                onFocus={handleInteraction}
                                 placeholder="Enter your email" 
                                 className="form-control"
                             />
@@ -67,6 +106,7 @@ const Login = ({ onNavigateToSignup }) => {
                                 id="password" 
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
+                                onFocus={handleInteraction}
                                 placeholder="Enter your password" 
                                 className="form-control"
                             />

@@ -6,7 +6,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
-const { getBlacklistData } = require('./scrapper'); // Make sure path is correct
+const { getBlacklistData, ensureDataReady } = require('./scrapper');// Make sure path is correct
 const cron = require('node-cron');
 const path = require('path');
 const axios = require('axios');
@@ -81,7 +81,34 @@ cron.schedule('0 * * * *', async () => {
   }
 });
 
-// API endpoint to get blacklist data
+// Add these new endpoints to your server.js file
+
+// Import the updated scrapper functions
+
+// Pre-warm endpoint - can be called when login page loads or login fields are focused
+app.get('/api/pre-warm', async (req, res) => {
+  try {
+    console.log('Pre-warming blacklist data cache');
+    
+    // This will start scraping in the background if needed and return cached data immediately
+    const data = await ensureDataReady();
+    
+    res.json({
+      status: 'success',
+      message: 'Pre-warming started',
+      data: data
+    });
+  } catch (error) {
+    console.error('Error pre-warming cache:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Failed to pre-warm cache',
+      error: error.message
+    });
+  }
+});
+
+// Keep your existing endpoint but modify it slightly
 app.get('/api/blacklist-stats', async (req, res) => {
   try {
     console.log('Received request for blacklist stats');

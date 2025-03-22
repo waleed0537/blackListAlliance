@@ -1,4 +1,4 @@
-// optimized-scraper.js - With visible window for debugging
+// scrapper.js - Production-compatible version
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const fs = require('fs');
@@ -10,6 +10,11 @@ puppeteer.use(StealthPlugin());
 // Cache file path
 const cacheFilePath = path.join(__dirname, 'data-cache.json');
 
+// Track if scraping is already in progress
+let isScraping = false;
+let lastScrapeTime = 0;
+const SCRAPE_COOLDOWN = 60000; // 1 minute cooldown between scrape attempts
+
 // Helper function for timeout
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -17,25 +22,54 @@ function sleep(ms) {
 
 // Function to scrape blacklist data
 async function scrapeBlacklistData() {
-  console.log('Starting optimized scraping process with visible window...');
+  // Prevent multiple simultaneous scraping attempts
+  if (isScraping) {
+    console.log('Scraping already in progress, returning cached data');
+    return getCachedData();
+  }
+
+  // Apply cooldown to prevent too frequent scraping
+  const now = Date.now();
+  if (now - lastScrapeTime < SCRAPE_COOLDOWN) {
+    console.log('Scrape cooldown active, returning cached data');
+    return getCachedData();
+  }
+
+  console.log('Starting production-compatible scraping process...');
+  isScraping = true;
+  lastScrapeTime = now;
   let browser = null;
   
   try {
-    // Launch browser with visible window but other optimizations
-    browser = await puppeteer.launch({
-      headless: false, // Show browser window for debugging
+    // Determine if we're in production or development
+    const isProduction = process.env.NODE_ENV === 'production';
+    
+    // Launch browser with appropriate settings for environment
+    const launchOptions = {
+      headless: isProduction ? 'new' : false, // Use headless in production, visible in development
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-web-security',
-        '--disable-gpu',
+        '--disable-features=IsolateOrigins,site-per-process',
         '--disable-dev-shm-usage',
-        '--window-size=1280,720',
-        '--start-maximized' // Ensure window is visible
       ],
-      defaultViewport: null, // Let viewport match window size
+      defaultViewport: { width: 1280, height: 720 },
       timeout: 30000
-    });
+    };
+    
+    // In production, we might need additional args
+    if (isProduction) {
+      launchOptions.args.push(
+        '--disable-gpu',
+        '--disable-software-rasterizer',
+        '--disable-dev-shm-usage',
+        '--single-process', // This can help in some production environments
+        '--no-zygote'
+      );
+    }
+    
+    browser = await puppeteer.launch(launchOptions);
     
     const page = await browser.newPage();
     
@@ -44,10 +78,6 @@ async function scrapeBlacklistData() {
     
     // Log navigation events for debugging
     page.on('console', msg => console.log(`BROWSER CONSOLE: ${msg.text()}`));
-    page.on('pageerror', error => console.log(`BROWSER PAGE ERROR: ${error.message}`));
-    
-    // Don't block resources to see the full page as it loads
-    // This helps identify where the issue might be
     
     // Set reasonable timeouts
     page.setDefaultNavigationTimeout(30000);
@@ -55,23 +85,19 @@ async function scrapeBlacklistData() {
     // Navigate to the login page
     console.log('Navigating to login page...');
     await page.goto('https://www3.blacklistalliance.com/login', { 
-      waitUntil: 'networkidle2', // Wait for all network activity to finish
+      waitUntil: 'networkidle2',
       timeout: 30000
     });
     console.log('Navigated to login page');
     
-    // Wait explicitly for login form to be fully loaded and ready
+    // Wait for login form
     await page.waitForSelector('input[name="email"]', { visible: true, timeout: 10000 })
       .catch(err => console.log('Warning: Email input not found with selector'));
     
-    // Take screenshot of login page for verification
-    await page.screenshot({ path: 'login-page.png' });
-    console.log('Login page screenshot saved');
-    
-    // Fill in login details more carefully
+    // Fill in login details
     console.log('Filling login form...');
     
-    // Clear existing values first
+    // Clear any existing values first
     await page.evaluate(() => {
       const email = document.querySelector('input[name="email"]');
       const password = document.querySelector('input[name="password"]');
@@ -85,7 +111,6 @@ async function scrapeBlacklistData() {
     console.log('Credentials entered');
     
     // Find and click login button
-    const loginButtonSelector = 'button[type="submit"], button:contains("Login"), button:contains("Sign In")';
     const buttonVisible = await page.evaluate(() => {
       const btn = Array.from(document.querySelectorAll('button')).find(b => 
         b.textContent.toLowerCase().includes('login') || 
@@ -111,15 +136,13 @@ async function scrapeBlacklistData() {
       });
     }
     
-    // Wait for navigation to complete after login attempt
+    // Wait for navigation
     console.log('Waiting for navigation after login...');
     try {
       await page.waitForNavigation({ timeout: 10000 });
       console.log('Navigation completed');
     } catch (navError) {
       console.log('Navigation timeout, checking current state...');
-      // Take screenshot after login attempt
-      await page.screenshot({ path: 'post-login.png' });
     }
     
     // Check current URL
@@ -136,159 +159,138 @@ async function scrapeBlacklistData() {
       console.log('Navigated to dashboard page');
     }
     
-    // Give dashboard plenty of time to load
+    // Give dashboard time to load
     console.log('Waiting for dashboard content to load...');
-    await sleep(3500); // Increased to 5 seconds for debugging
+    await sleep(3000);
     
-    // Take screenshot of dashboard for debugging
-    await page.screenshot({ path: 'dashboard.png', fullPage: true });
-    console.log('Dashboard screenshot saved');
-    
-    // Check if dashboard has loaded properly
-    const dashboardLoaded = await page.evaluate(() => {
-      // Look for typical dashboard elements
-      const hasStats = document.querySelectorAll('.stat-value').length > 0;
-      const hasCards = document.querySelectorAll('.card').length > 0;
-      const hasHeader = document.querySelector('.header') !== null;
-      
-      return {
-        hasStats,
-        hasCards, 
-        hasHeader,
-        title: document.title,
-        bodyText: document.body.innerText.substring(0, 500) // First 500 chars
-      };
-    });
-    
-    console.log('Dashboard verification:', dashboardLoaded);
-    
-    // Extract data with detailed logging
-    console.log('Extracting dashboard data...');
-    
-    // First approach: Try to find data using CSS selectors with detailed logging
-    let newBlacklistedNumbers = null;
-    let remainingScrubs = null;
-    
-    const detailedExtraction = await page.evaluate(() => {
-      // Log all stat-related elements for debugging
-      const results = {
-        statElements: [],
-        possibleStatsText: [],
-        relevantElementsFound: false
-      };
-      
-      // Look for stats elements
-      const statElements = document.querySelectorAll('.stat-value, .stat-item, span.stat-value');
-      if (statElements.length > 0) {
-        results.relevantElementsFound = true;
-        Array.from(statElements).forEach((el, i) => {
-          results.statElements.push({
-            index: i,
-            text: el.textContent.trim(),
-            className: el.className,
-            parentClass: el.parentElement ? el.parentElement.className : 'none'
-          });
-        });
-      }
-      
-      // Look for text containing keywords
-      const allElements = document.querySelectorAll('*');
-      Array.from(allElements).forEach(el => {
-        const text = el.textContent || '';
-        if (text.includes('Blacklisted') || text.includes('Scrubs')) {
-          results.possibleStatsText.push({
-            text: text.trim().substring(0, 100), // Limit length
-            tag: el.tagName,
-            className: el.className
-          });
+    // Extract data using multiple selector strategies for greater reliability
+    const extractedStats = await page.evaluate(() => {
+      // Create an array of different selector strategies
+      const strategies = [
+        // Strategy 1: Regular CSS selectors
+        () => {
+          const stats = {};
+          const blacklistedElem = document.querySelector('.stat-value');
+          const remainingElem = document.querySelectorAll('.stat-value')[1];
+          
+          if (blacklistedElem) stats.newBlacklistedNumbers = parseInt(blacklistedElem.textContent.trim(), 10);
+          if (remainingElem) stats.remainingScrubs = remainingElem.textContent.trim();
+          
+          return stats;
+        },
+        
+        // Strategy 2: Text content analysis
+        () => {
+          const stats = {};
+          const elements = document.querySelectorAll('*');
+          
+          for (const el of elements) {
+            const text = el.textContent || '';
+            
+            // Look for blacklisted numbers
+            if (text.match(/New\s+Blacklisted\s+Numbers/i)) {
+              const parent = el.closest('.stat-item') || el.parentElement;
+              const valueEl = parent.querySelector('.stat-value');
+              if (valueEl) {
+                stats.newBlacklistedNumbers = parseInt(valueEl.textContent.trim(), 10);
+              }
+            }
+            
+            // Look for remaining scrubs
+            if (text.match(/Remaining\s+Scrubs/i)) {
+              const parent = el.closest('.stat-item') || el.parentElement;
+              const valueEl = parent.querySelector('.stat-value');
+              if (valueEl) {
+                stats.remainingScrubs = valueEl.textContent.trim();
+              }
+            }
+          }
+          
+          return stats;
+        },
+        
+        // Strategy 3: Direct text search in body content
+        () => {
+          const stats = {};
+          const bodyText = document.body.innerText;
+          
+          const blacklistedMatch = bodyText.match(/(\d+)\s+New\s+Blacklisted\s+Numbers/i);
+          if (blacklistedMatch) {
+            stats.newBlacklistedNumbers = blacklistedMatch[1];
+          }
+          
+          const scrubsMatch = bodyText.match(/Remaining\s+Scrubs[:.\s]*([\d,]+)/i);
+          if (scrubsMatch) {
+            stats.remainingScrubs = scrubsMatch[1];
+          }
+          
+          return stats;
         }
-      });
+      ];
+      
+      // Try each strategy until we get results
+      let results = {};
+      for (const strategy of strategies) {
+        const strategyResults = strategy();
+        if (strategyResults.newBlacklistedNumbers || strategyResults.remainingScrubs) {
+          if (strategyResults.newBlacklistedNumbers) results.newBlacklistedNumbers = strategyResults.newBlacklistedNumbers;
+          if (strategyResults.remainingScrubs) results.remainingScrubs = strategyResults.remainingScrubs;
+          
+          if (results.newBlacklistedNumbers && results.remainingScrubs) break;
+        }
+      }
       
       return results;
     });
     
-    console.log('Detailed extraction results:', JSON.stringify(detailedExtraction, null, 2));
-    
-    // Try to extract specific stats based on the detailed info
-    const extractedStats = await page.evaluate(() => {
-      // Try multiple selector patterns
-      const selectors = [
-        '.stat-value', 
-        '.stat-item span', 
-        'span.stat-value',
-        '.stat-container .value',
-        '[data-testid="stat-value"]'
-      ];
-      
-      let foundElements = [];
-      selectors.forEach(selector => {
-        const elements = document.querySelectorAll(selector);
-        if (elements.length > 0) {
-          foundElements.push({
-            selector,
-            count: elements.length,
-            values: Array.from(elements).map(el => el.textContent.trim())
-          });
-        }
-      });
-      
-      // Direct text search
-      let newBlacklistedNumbers = null;
-      let remainingScrubs = null;
-      
-      // Check entire page text
-      const bodyText = document.body.innerText;
-      
-      // Look for New Blacklisted Numbers
-      const blacklistedMatch = bodyText.match(/(\d+)\s+New\s+Blacklisted\s+Numbers/i);
-      if (blacklistedMatch) {
-        newBlacklistedNumbers = blacklistedMatch[1];
-      }
-      
-      // Look for Remaining Scrubs
-      const scrubsMatch = bodyText.match(/Remaining\s+Scrubs:\s*([\d,]+)/i);
-      if (scrubsMatch) {
-        remainingScrubs = scrubsMatch[1];
-      }
-      
-      return {
-        foundElements,
-        newBlacklistedNumbers,
-        remainingScrubs,
-        bodyTextSample: bodyText.substring(0, 1000) // First 1000 chars for debugging
-      };
-    });
-    
-    console.log('Stats extraction results:', JSON.stringify(extractedStats, null, 2));
+    console.log('Stats extraction results:', extractedStats);
     
     // Process the extracted data
-    if (extractedStats.newBlacklistedNumbers) {
-      newBlacklistedNumbers = parseInt(extractedStats.newBlacklistedNumbers, 10);
-      console.log('Found new blacklisted numbers:', newBlacklistedNumbers);
-    }
+    let newBlacklistedNumbers = extractedStats.newBlacklistedNumbers ? 
+      (typeof extractedStats.newBlacklistedNumbers === 'string' ? 
+        parseInt(extractedStats.newBlacklistedNumbers, 10) : 
+        extractedStats.newBlacklistedNumbers) : null;
     
-    if (extractedStats.remainingScrubs) {
-      remainingScrubs = extractedStats.remainingScrubs;
-      console.log('Found remaining scrubs:', remainingScrubs);
-    }
+    let remainingScrubs = extractedStats.remainingScrubs || null;
     
     // Check if we're using fallback values
     const usingFallback = !newBlacklistedNumbers || !remainingScrubs;
     console.log('Using fallback values?', usingFallback);
     
-    // Use hardcoded values as fallback
+    // Use cached data first if available, then hardcoded values
+    if (usingFallback) {
+      try {
+        if (fs.existsSync(cacheFilePath)) {
+          const cachedData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
+          
+          if (!newBlacklistedNumbers && cachedData.newBlacklistedNumbers) {
+            newBlacklistedNumbers = cachedData.newBlacklistedNumbers;
+            console.log('Using cached value for new blacklisted numbers:', newBlacklistedNumbers);
+          }
+          
+          if (!remainingScrubs && cachedData.remainingScrubs) {
+            remainingScrubs = cachedData.remainingScrubs;
+            console.log('Using cached value for remaining scrubs:', remainingScrubs);
+          }
+        }
+      } catch (cacheErr) {
+        console.error('Error reading from cache:', cacheErr);
+      }
+    }
+    
+    // If still no values, use hardcoded fallbacks
     if (!newBlacklistedNumbers) {
       newBlacklistedNumbers = 755;
       console.log('Using hardcoded value for new blacklisted numbers:', newBlacklistedNumbers);
     }
     
     if (!remainingScrubs) {
-      remainingScrubs = "46,138,058";
+      remainingScrubs = "39,806,098";
       console.log('Using hardcoded value for remaining scrubs:', remainingScrubs);
     }
     
-    // Allow some time to view the dashboard before closing
-    await sleep(3000);
+    // Allow some time for any final data to load
+    await sleep(1000);
     
     // Prepare the data to return
     const data = {
@@ -308,6 +310,7 @@ async function scrapeBlacklistData() {
     await browser.close();
     console.log('Browser closed');
     
+    isScraping = false;
     return data;
   } catch (error) {
     console.error('Error scraping data:', error);
@@ -322,30 +325,36 @@ async function scrapeBlacklistData() {
       }
     }
     
-    // Try to read from cache if scraping fails
-    if (fs.existsSync(cacheFilePath)) {
-      console.log('Reading from cache file due to scraping failure');
-      try {
-        const cachedData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
-        return {
-          ...cachedData,
-          fromCache: true,
-          error: error.message
-        };
-      } catch (cacheError) {
-        console.error('Error reading cache file:', cacheError);
-      }
-    }
+    // Use cached data if available
+    const cachedData = getCachedData();
     
-    // If all else fails, use the fallback values
-    return {
-      newBlacklistedNumbers: 755,
-      remainingScrubs: "46,138,058",
-      lastUpdated: new Date().toISOString(),
-      isFallback: true,
-      error: error.message
-    };
+    isScraping = false;
+    return cachedData;
   }
+}
+
+// Helper function to get cached data
+function getCachedData() {
+  try {
+    if (fs.existsSync(cacheFilePath)) {
+      console.log('Reading from cache file');
+      const cachedData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
+      return {
+        ...cachedData,
+        fromCache: true
+      };
+    }
+  } catch (cacheError) {
+    console.error('Error reading cache file:', cacheError);
+  }
+  
+  // Fallback data if cache is unavailable
+  return {
+    newBlacklistedNumbers: 755,
+    remainingScrubs: "39,806,098",
+    lastUpdated: new Date().toISOString(),
+    isFallback: true
+  };
 }
 
 // Function to get data (with optional cache)
@@ -359,7 +368,10 @@ async function getBlacklistData(useCache = true) {
       // Use cache if it's less than 1 hour old
       if (cacheAge < 3600000) { // 1 hour in milliseconds
         console.log('Using cached data (less than 1 hour old)');
-        return cachedData;
+        return {
+          ...cachedData,
+          fromCache: true
+        };
       }
     } catch (error) {
       console.error('Error reading cache:', error);
@@ -370,7 +382,37 @@ async function getBlacklistData(useCache = true) {
   return await scrapeBlacklistData();
 }
 
+// Function to ensure data is ready in the cache
+async function ensureDataReady() {
+  // If cache doesn't exist or is too old, start scraping in the background
+  let shouldScrape = false;
+  
+  if (fs.existsSync(cacheFilePath)) {
+    try {
+      const cachedData = JSON.parse(fs.readFileSync(cacheFilePath, 'utf8'));
+      const cacheAge = Date.now() - new Date(cachedData.lastUpdated).getTime();
+      shouldScrape = cacheAge > 3600000; // older than 1 hour
+    } catch (error) {
+      shouldScrape = true;
+    }
+  } else {
+    shouldScrape = true;
+  }
+  
+  if (shouldScrape && !isScraping) {
+    // Start scraping in the background without awaiting it
+    console.log('Starting background scraping...');
+    scrapeBlacklistData().catch(err => console.error('Background scraping error:', err));
+    
+    // Return cached data or default data immediately
+    return getCachedData();
+  }
+  
+  return getCachedData();
+}
+
 module.exports = {
   scrapeBlacklistData,
-  getBlacklistData
+  getBlacklistData,
+  ensureDataReady
 };

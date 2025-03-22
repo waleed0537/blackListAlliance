@@ -8,15 +8,18 @@ export const getBlacklistStats = async (forceRefresh = false) => {
   try {
     console.log('Fetching blacklist stats from API, forceRefresh:', forceRefresh);
     
-    // Use the configured API URL
-    const endpoint = '/api/blacklist-stats';
+    // Determine endpoint based on whether we need to force refresh
+    const endpoint = forceRefresh ? '/api/blacklist-stats' : '/api/pre-warm';
     const url = `${API_URL}${endpoint}${forceRefresh ? '?refresh=true' : ''}`;
     
     console.log('Requesting URL:', url);
     const response = await axios.get(url);
     
-    console.log('Received data:', response.data);
-    return response.data;
+    // Extract data differently based on which endpoint was used
+    const data = endpoint === '/api/pre-warm' ? response.data.data : response.data;
+    
+    console.log('Received data:', data);
+    return data;
   } catch (error) {
     console.error('Error fetching blacklist stats:', error);
     throw error; // Let the caller handle the error

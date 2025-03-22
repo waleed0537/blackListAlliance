@@ -30,7 +30,8 @@ import {
     FaBuilding,
     FaBriefcase,
     FaMapMarked,
-    FaInfoCircle
+    FaInfoCircle,
+    FaLock
 } from 'react-icons/fa';
 import FileUploader from './FileUploader';
 import AuthContext from './AuthContext';
@@ -60,6 +61,7 @@ const Dashboard = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [showFirewall, setShowFirewall] = useState(false);
     const [showPricing, setShowPricing] = useState(false);
+    const [showAccountDetails, setShowAccountDetails] = useState(false);
     const [numberResult, setNumberResult] = useState(null);
     const [emailResult, setEmailResult] = useState(null);
     const [numberError, setNumberError] = useState(null);
@@ -68,6 +70,16 @@ const Dashboard = () => {
     const [emailLoading, setEmailLoading] = useState(false);
     const [isRefreshingStats, setIsRefreshingStats] = useState(false);
     const apiKey = "Pkcka4f2BbdHh2FhzJtx";
+    
+    // Account profile states
+    const [accountName, setAccountName] = useState(user?.name || '');
+    const [accountEmail, setAccountEmail] = useState(user?.email || '');
+    const [currentPassword, setCurrentPassword] = useState('');
+    const [newPassword, setNewPassword] = useState('');
+    const [confirmPassword, setConfirmPassword] = useState('');
+    const [accountError, setAccountError] = useState(null);
+    const [accountSuccess, setAccountSuccess] = useState(null);
+    const [accountUpdating, setAccountUpdating] = useState(false);
 
     // Contact form states
     const [showContactForm, setShowContactForm] = useState(false);
@@ -290,7 +302,108 @@ const Dashboard = () => {
     const handleLogout = () => {
         logout();
     };
-
+    
+    // Function to handle redirection to Number Verifier
+    const handleAccessNumberVerifier = () => {
+        window.open('https://app.numberverifier.com/', '_blank');
+    };
+    
+    // Function to toggle account details panel
+    const toggleAccountDetails = () => {
+        setShowAccountDetails(!showAccountDetails);
+        if (!showAccountDetails) {
+            // Reset form when opening
+            setAccountName(user?.name || '');
+            setAccountEmail(user?.email || '');
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            setAccountError(null);
+            setAccountSuccess(null);
+        }
+    };
+    
+    // Function to update account details
+    const handleUpdateAccount = async (e) => {
+        e.preventDefault();
+        
+        // Reset status messages
+        setAccountError(null);
+        setAccountSuccess(null);
+        
+        // Validate form
+        if (!accountName.trim()) {
+            setAccountError("Name is required");
+            return;
+        }
+        
+        if (!accountEmail.trim()) {
+            setAccountError("Email is required");
+            return;
+        }
+        
+        // Email validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(accountEmail)) {
+            setAccountError("Please enter a valid email address");
+            return;
+        }
+        
+        // Password validation - only check if user is trying to change password
+        if (newPassword || confirmPassword || currentPassword) {
+            if (!currentPassword) {
+                setAccountError("Current password is required to change password");
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                setAccountError("New passwords do not match");
+                return;
+            }
+            
+            if (newPassword.length < 8) {
+                setAccountError("New password must be at least 8 characters");
+                return;
+            }
+        }
+        
+        setAccountUpdating(true);
+        
+        try {
+            // In a real application, this would be an API call to update user info
+            // For this demo, we'll simulate a successful update
+            setTimeout(() => {
+                setAccountUpdating(false);
+                setAccountSuccess("Account information updated successfully!");
+                
+                // Update user context (this would be handled by API response in a real app)
+                // This is a mock implementation and might not update the actual user context
+                if (user) {
+                    user.name = accountName;
+                    user.email = accountEmail;
+                }
+            }, 1500);
+            
+            // In a real application you would have code like this:
+            /*
+            const response = await api.put('/api/user', {
+                name: accountName,
+                email: accountEmail,
+                currentPassword,
+                newPassword
+            });
+            
+            if (response.data.success) {
+                setAccountSuccess("Account information updated successfully!");
+                // Update user context with new info
+            }
+            */
+        } catch (error) {
+            setAccountError("Failed to update account. Please try again later.");
+        } finally {
+            setAccountUpdating(false);
+        }
+    };
 
     const handlePhoneLookup = () => {
         // Remove any non-digit characters except the plus sign at the start
@@ -434,7 +547,7 @@ const Dashboard = () => {
                     </button>
                     <div className="logo">
                         <h1>THE DNC<span>ALLIANCE</span></h1>
-                        <p>- (MARS Advertising LLC)</p>
+                        
                     </div>
                 </div>
                 <div className="header-right">
@@ -755,7 +868,7 @@ const Dashboard = () => {
                         <>
                             <div className="welcome-section">
                                 <div className="welcome-header">
-                                    <h2>Hello {user?.name || 'MARS Advertising LLC'},</h2>
+                                    <h2>Hello {user?.name}</h2>
                                     <button 
                                         className="action-button billing-button" 
                                         onClick={togglePricing}
@@ -851,7 +964,7 @@ const Dashboard = () => {
                                                     <li><span className="bullet">•</span> Unlimited attorney consultations</li>
                                                     <li><span className="bullet">•</span> Five prepaid settlements or compliance reviews per year</li>
                                                     <li><span className="bullet">•</span> 1000 phone number reputation queries per month</li>
-                                                    <li><span className="bullet">•</span> Fifty logins to the <span className="highlight-feature">Blacklist Academy</span> compliance training and legal resource platform</li>
+                                                    <li><span className="bullet">•</span> Fifty logins to the <span className="highlight-feature"> DNC Academy </span> compliance training and legal resource platform</li>
                                                 </ul>
                                             </div>
                                             
@@ -940,41 +1053,7 @@ const Dashboard = () => {
                                     </button>
                                 </div>
 
-                                {/* Access Case Database Card */}
-                                <div className="card">
-                                    <div className="card-content">
-                                        <div className="card-icon">
-                                            <div className="icon-bg database">
-                                                <FaDatabase />
-                                            </div>
-                                        </div>
-                                        <div className="card-details">
-                                            <h3>ACCESS CASE DATABASE</h3>
-                                            <p>Search cases, plaintiffs, attorneys, and defendants</p>
-                                        </div>
-                                    </div>
-                                    <button className="card-action">
-                                        Access Case Database <FaArrowRight />
-                                    </button>
-                                </div>
-
-                                {/* Contact Legal Support Card */}
-                                <div className="card">
-                                    <div className="card-content">
-                                        <div className="card-icon">
-                                            <div className="icon-bg support">
-                                                <FaBalanceScale />
-                                            </div>
-                                        </div>
-                                        <div className="card-details">
-                                            <h3>CONTACT LEGAL SUPPORT</h3>
-                                            <p>Request assistance with a TCPA claim or compliance matter</p>
-                                        </div>
-                                    </div>
-                                    <button className="card-action">
-                                        Access Form <FaArrowRight />
-                                    </button>
-                                </div>
+                             
 
                                 {/* Contact Us Card - NEW */}
                                 <div className="card">
@@ -1004,69 +1083,17 @@ const Dashboard = () => {
                                         </div>
                                         <div className="card-details">
                                             <h3>ACCOUNT</h3>
-                                            <p>MARS Advertising LLC</p>
+                                        
                                             <p>View account details and configure your scrub preferences</p>
                                         </div>
                                     </div>
-                                    <button className="card-action">
+                                    <button className="card-action" onClick={toggleAccountDetails}>
                                         View Account Details <FaArrowRight />
                                     </button>
                                 </div>
 
-                                {/* Caller ID Check Card */}
-                                <div className="card">
-                                    <div className="card-content">
-                                        <div className="card-icon">
-                                            <div className="icon-bg caller">
-                                                <FaPhoneAlt />
-                                            </div>
-                                        </div>
-                                        <div className="card-details">
-                                            <h3>CALLER ID CHECK</h3>
-                                            <p>Included monthly lookups: 1000</p>
-                                            <p>Use the Number Evaluation Engine to check whether outbound DIDs have been reported to the FTC or FCC.</p>
-                                        </div>
-                                    </div>
-                                    <button className="card-action">
-                                        Access Engine <FaArrowRight />
-                                    </button>
-                                </div>
 
-                                {/* Blacklist Academy Card */}
-                                <div className="card">
-                                    <div className="card-content">
-                                        <div className="card-icon">
-                                            <div className="icon-bg academy">
-                                                <FaGraduationCap />
-                                            </div>
-                                        </div>
-                                        <div className="card-details">
-                                            <h3>DNC ACADEMY LOGIN</h3>
-                                            <p>Take online classes and access legal and compliance resources</p>
-                                        </div>
-                                    </div>
-                                    <button className="card-action">
-                                        Login To DNC Academy <FaArrowRight />
-                                    </button>
-                                </div>
-
-                                {/* Pre-litigation Feed Card */}
-                                <div className="card">
-                                    <div className="card-content">
-                                        <div className="card-icon">
-                                            <div className="icon-bg prelitigation">
-                                                <FaBalanceScale />
-                                            </div>
-                                        </div>
-                                        <div className="card-details">
-                                            <h3>PRE-LITIGATION FEED REQUESTS</h3>
-                                            <p>Submit high risk numbers to be added to the Pre-litigation Feed</p>
-                                        </div>
-                                    </div>
-                                    <button className="card-action">
-                                        Submit Request <FaArrowRight />
-                                    </button>
-                                </div>
+                                
 
                                 {/* Number Verifier Card */}
                                 <div className="card">
@@ -1079,10 +1106,10 @@ const Dashboard = () => {
                                         <div className="card-details">
                                             <h3>NUMBER VERIFIER</h3>
                                             <p>Identify Caller IDs wrongly tagged as spam by carrier algorithms, manage Caller IDs in real time, increase answer rates and boost conversions.</p>
-                                            <button className="secondary-action">Create New Account</button>
+                                            
                                         </div>
                                     </div>
-                                    <button className="card-action">
+                                    <button className="card-action" onClick={handleAccessNumberVerifier}>
                                         Access Number Verifier <FaArrowRight />
                                     </button>
                                 </div>
@@ -1094,7 +1121,7 @@ const Dashboard = () => {
                             <div className="footer-company">
                                 <div className="footer-logo">
                                     <p><FaBuilding className="footer-icon" /> THE DNC<span>ALLIANCE</span></p>
-                                    <p><FaBriefcase className="footer-icon" /> A division of MARS Advertising LLC</p>
+                                    
                                 </div>
                                 <div className="footer-address">
                                     <p><FaMapMarkerAlt className="footer-icon" /> 1250 Broadway, 36th Floor</p>
@@ -1285,6 +1312,148 @@ const Dashboard = () => {
                                     Cancel
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Account Details Modal */}
+            {showAccountDetails && (
+                <div className="modal-overlay" onClick={() => setShowAccountDetails(false)}>
+                    <div className="modal-content account-details-modal" onClick={(e) => e.stopPropagation()}>
+                        <div className="modal-header">
+                            <h2>Account Details</h2>
+                            <button className="modal-close" onClick={() => setShowAccountDetails(false)}>
+                                <FaTimes />
+                            </button>
+                        </div>
+                        
+                        <div className="modal-body">
+                            {accountSuccess && (
+                                <div className="success-message">
+                                    <FaCheckCircle className="success-icon" />
+                                    <p>{accountSuccess}</p>
+                                </div>
+                            )}
+                            
+                            {accountError && (
+                                <div className="error-message">
+                                    <p>{accountError}</p>
+                                </div>
+                            )}
+                            
+                            <form className="account-form" onSubmit={handleUpdateAccount}>
+                                <div className="form-group">
+                                    <label htmlFor="accountName">Full Name</label>
+                                    <div className="input-icon-wrapper">
+                                        <FaUserCircle className="input-icon" />
+                                        <input
+                                            type="text"
+                                            id="accountName"
+                                            className="form-control"
+                                            placeholder="Your Name"
+                                            value={accountName}
+                                            onChange={(e) => setAccountName(e.target.value)}
+                                            disabled={accountUpdating}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label htmlFor="accountEmail">Email Address</label>
+                                    <div className="input-icon-wrapper">
+                                        <FaEnvelope className="input-icon" />
+                                        <input
+                                            type="email"
+                                            id="accountEmail"
+                                            className="form-control"
+                                            placeholder="your@email.com"
+                                            value={accountEmail}
+                                            onChange={(e) => setAccountEmail(e.target.value)}
+                                            disabled={accountUpdating}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="form-divider">
+                                    <h3>Change Password</h3>
+                                    <p className="form-note">Leave blank if you don't want to change your password</p>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label htmlFor="currentPassword">Current Password</label>
+                                    <div className="input-icon-wrapper">
+                                        <FaLock className="input-icon" />
+                                        <input
+                                            type="password"
+                                            id="currentPassword"
+                                            className="form-control"
+                                            placeholder="Enter current password"
+                                            value={currentPassword}
+                                            onChange={(e) => setCurrentPassword(e.target.value)}
+                                            disabled={accountUpdating}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label htmlFor="newPassword">New Password</label>
+                                    <div className="input-icon-wrapper">
+                                        <FaLock className="input-icon" />
+                                        <input
+                                            type="password"
+                                            id="newPassword"
+                                            className="form-control"
+                                            placeholder="Enter new password"
+                                            value={newPassword}
+                                            onChange={(e) => setNewPassword(e.target.value)}
+                                            disabled={accountUpdating}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="form-group">
+                                    <label htmlFor="confirmPassword">Confirm New Password</label>
+                                    <div className="input-icon-wrapper">
+                                        <FaLock className="input-icon" />
+                                        <input
+                                            type="password"
+                                            id="confirmPassword"
+                                            className="form-control"
+                                            placeholder="Confirm new password"
+                                            value={confirmPassword}
+                                            onChange={(e) => setConfirmPassword(e.target.value)}
+                                            disabled={accountUpdating}
+                                        />
+                                    </div>
+                                </div>
+                                
+                                <div className="button-group">
+                                    <button 
+                                        type="submit" 
+                                        className="primary-button"
+                                        disabled={accountUpdating}
+                                    >
+                                        {accountUpdating ? (
+                                            <>
+                                                <FaSync className="spinning" /> Updating...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <FaCheckCircle /> Save Changes
+                                            </>
+                                        )}
+                                    </button>
+                                    <button 
+                                        type="button" 
+                                        className="secondary-button"
+                                        onClick={() => setShowAccountDetails(false)}
+                                        disabled={accountUpdating}
+                                    >
+                                        Cancel
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 </div>
