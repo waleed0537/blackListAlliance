@@ -43,7 +43,22 @@ export const authService = {
       throw error.response ? error.response.data : { message: 'Network error' };
     }
   },
-
+  updateProfile: async (userData) => {
+    try {
+      const response = await api.put('/api/user/profile', userData);
+      
+      // If the update includes email or name, update the stored user data
+      if (response.data.success && response.data.user) {
+        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const updatedUser = { ...currentUser, ...response.data.user };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+      
+      return response.data;
+    } catch (error) {
+      throw error.response ? error.response.data : { message: 'Network error' };
+    }
+  },
   // Register user
   signup: async (name, email, password) => {
     try {

@@ -221,16 +221,32 @@ const Dashboard = () => {
     };
 
     // Function to manually refresh blacklist data
-    const handleRefreshBlacklistData = async () => {
-        setIsRefreshingStats(true);
-        try {
-            await refreshData(true); // Force refresh data from server
-        } catch (error) {
-            console.error('Error refreshing blacklist data:', error);
-        } finally {
-            setIsRefreshingStats(false);
-        }
-    };
+    // Update this section in your Dashboard.jsx file (just the refresh button handler)
+
+// Function to manually refresh blacklist data
+// Updated Dashboard.jsx handleRefreshBlacklistData function
+// This fixes the "setBlacklistData is not defined" error
+
+// Function to manually refresh blacklist data
+const handleRefreshBlacklistData = async () => {
+    setIsRefreshingStats(true);
+    try {
+      console.log('Manual refresh button clicked, forcing refresh...');
+      
+      // No need to set blacklistData directly - refreshData will handle it
+      // Wait a moment to ensure loading state is visible
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Trigger refresh with force=true
+      await refreshData(true); 
+      
+      console.log('Manual refresh completed successfully');
+    } catch (error) {
+      console.error('Error refreshing blacklist data:', error);
+    } finally {
+      setIsRefreshingStats(false);
+    }
+  };
     
     const handleNumberUploadComplete = (data) => {
         console.log('Number scrub completed:', data);
@@ -370,36 +386,70 @@ const Dashboard = () => {
         setAccountUpdating(true);
         
         try {
-            // In a real application, this would be an API call to update user info
-            // For this demo, we'll simulate a successful update
-            setTimeout(() => {
-                setAccountUpdating(false);
-                setAccountSuccess("Account information updated successfully!");
+            // Create the request data
+            const updateData = {
+                name: accountName,
+                email: accountEmail
+            };
+            
+            // Only include password fields if the user is changing their password
+            if (currentPassword && newPassword) {
+                updateData.currentPassword = currentPassword;
+                updateData.newPassword = newPassword;
+            }
+            
+            // Get API URL from environment or use default
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+            
+            // Make API call to update user profile
+            const response = await axios.put(
+                `${API_URL}/api/user/profile`, 
+                updateData,
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'x-auth-token': localStorage.getItem('token')
+                    }
+                }
+            );
+            
+            // Handle successful response
+            if (response.data.success) {
+                setAccountSuccess(response.data.message || "Account information updated successfully!");
                 
-                // Update user context (this would be handled by API response in a real app)
-                // This is a mock implementation and might not update the actual user context
+                // Update the user in localStorage
+                const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const updatedUser = {
+                    ...currentUser,
+                    name: accountName,
+                    email: accountEmail
+                };
+                localStorage.setItem('user', JSON.stringify(updatedUser));
+                
+                // Clear password fields
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+                
+                // Update user context if available
                 if (user) {
                     user.name = accountName;
                     user.email = accountEmail;
                 }
-            }, 1500);
-            
-            // In a real application you would have code like this:
-            /*
-            const response = await api.put('/api/user', {
-                name: accountName,
-                email: accountEmail,
-                currentPassword,
-                newPassword
-            });
-            
-            if (response.data.success) {
-                setAccountSuccess("Account information updated successfully!");
-                // Update user context with new info
             }
-            */
         } catch (error) {
-            setAccountError("Failed to update account. Please try again later.");
+            console.error('Error updating account:', error);
+            
+            let errorMessage = "Failed to update account. Please try again later.";
+            
+            if (error.response) {
+                // Extract error message from API response
+                errorMessage = error.response.data.message || errorMessage;
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            setAccountError(errorMessage);
         } finally {
             setAccountUpdating(false);
         }
@@ -589,27 +639,12 @@ const Dashboard = () => {
                                 </div>
                                 {functionsOpen && (
                                     <ul className="submenu">
-                                        <li>Edit Account</li>
-                                        <li>DNC Academy</li>
-                                        <li>Legal Support</li>
-                                        <li className={showFirewall ? 'active' : ''}>Litigation Firewall</li>
-                                        <li>Number Evaluation Engine</li>
-                                        <li>Case Database</li>
-                                        <li>Submit Number to Prelitigation</li>
+                                        <li className={showFirewall ? 'active' : ''} onClick={() => toggleSection('litigation')}>Litigation Firewall</li>
+                                        <li onClick={toggleAccountDetails}>Account Details</li>
+                                        <li onClick={handleAccessNumberVerifier}>Number Verifier</li>
+                                        <li onClick={togglePricing}>Account & Billing</li>
                                     </ul>
                                 )}
-                            </li>
-                            <li className="nav-item">
-                                <FaBook />
-                                <span>User Guide</span>
-                            </li>
-                            <li className="nav-item">
-                                <FaCog />
-                                <span>Standalone Application</span>
-                            </li>
-                            <li className="nav-item">
-                                <FaCog />
-                                <span>DNC Version Certification</span>
                             </li>
                             <li className="nav-item" onClick={openContactForm}>
                                 <FaEnvelope />
@@ -993,45 +1028,8 @@ const Dashboard = () => {
                                     </div>
                                 )}
                                 
-                                <div className="stats-container">
-                                    <div className="stat-item">
-                                        <div className="stat-header">
-                                            <span className="stat-label">New Blacklisted Numbers Today</span>
-                                            <button
-                                                className="refresh-button"
-                                                onClick={handleRefreshBlacklistData}
-                                                disabled={isRefreshingStats}
-                                                title="Refresh Stats"
-                                            >
-                                                <FaSync className={isRefreshingStats ? 'spinning' : ''} />
-                                            </button>
-                                        </div>
-                                        {isLoadingBlacklistData ? (
-                                            <div className="stat-loading">Loading...</div>
-                                        ) : blacklistError ? (
-                                            <div className="stat-error">Error loading data</div>
-                                        ) : (
-                                            <span className="stat-value">{newBlacklistedNumbers || '—'}</span>
-                                        )}
-                                    </div>
-                                    <div className="stat-item">
-                                        <div className="stat-header">
-                                            <span className="stat-label">Remaining Scrubs</span>
-                                        </div>
-                                        {isLoadingBlacklistData ? (
-                                            <div className="stat-loading">Loading...</div>
-                                        ) : blacklistError ? (
-                                            <div className="stat-error">Error loading data</div>
-                                        ) : (
-                                            <span className="stat-value">{remainingScrubs || '—'}</span>
-                                        )}
-                                    </div>
-                                </div>
-                                {lastUpdated && (
-                                    <div className="last-updated">
-                                        Last updated: {formatLastUpdated()}
-                                    </div>
-                                )}
+                                
+                              
                             </div>
 
                             <div className="cards-grid">
@@ -1084,7 +1082,7 @@ const Dashboard = () => {
                                         <div className="card-details">
                                             <h3>ACCOUNT</h3>
                                         
-                                            <p>View account details and configure your scrub preferences</p>
+                                            <p>View account profile and edit your details</p>
                                         </div>
                                     </div>
                                     <button className="card-action" onClick={toggleAccountDetails}>

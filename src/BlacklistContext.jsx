@@ -12,20 +12,18 @@ export const BlacklistProvider = ({ children }) => {
   });
 
   // Use this function to ensure we have both display data and background refreshing
-  const loadData = async (immediate = false) => {
-    // Immediately update UI with cached data if available
-    const showLoadingState = immediate;
-    
-    if (showLoadingState) {
+  const loadData = async (forceRefresh = false) => {
+    // Set loading state when forcing refresh
+    if (forceRefresh) {
       setBlacklistData(prev => ({ ...prev, isLoading: true }));
     }
     
     try {
-      // First attempt to get data from the pre-warm endpoint for an immediate response
+      // Get API URL from environment
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
       
-      // For immediate displays, try to get pre-warmed data first
-      if (immediate) {
+      // For immediate displays without force refresh, try to get pre-warmed data first
+      if (!forceRefresh) {
         try {
           const preWarmResponse = await axios.get(`${API_URL}/api/pre-warm`);
           console.log('Pre-warmed data received:', preWarmResponse.data);
@@ -44,31 +42,35 @@ export const BlacklistProvider = ({ children }) => {
         }
       }
       
-      // Now fetch the actual data (which might take longer but be more up-to-date)
-      console.log('Fetching blacklist data with forceRefresh:', immediate);
-      const data = await getBlacklistStats(immediate);
+      // Now fetch the actual data with force refresh if requested
+      console.log('Fetching blacklist data with forceRefresh:', forceRefresh);
+      
+      // Use the utility function which handles timestamps and caching
+      const data = await getBlacklistStats(forceRefresh);
       console.log('Blacklist data refreshed:', data);
       
       // Update state with the new data
       setBlacklistData({
         newBlacklistedNumbers: data.newBlacklistedNumbers,
         remainingScrubs: data.remainingScrubs,
-        lastUpdated: data.lastUpdated,
+        lastUpdated: data.lastUpdated || new Date().toISOString(),
         isLoading: false,
-        fromCache: data.fromCache
+        fromCache: data.fromCache || false
       });
     } catch (error) {
-      console.log('Could not refresh data');
+      console.error('Could not refresh data:', error);
       setBlacklistData(prev => ({
         ...prev,
         isLoading: false,
-        error: error.message
+        error: error.message,
+        lastError: new Date().toISOString()
       }));
     }
   };
 
   // Function exposed to components to force a refresh
-  const refreshData = async (forceRefresh = false) => {
+  const refreshData = async (forceRefresh = true) => {
+    console.log('Force refresh requested:', forceRefresh);
     return loadData(forceRefresh);
   };
 

@@ -6,10 +6,17 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const dotenv = require('dotenv');
 const nodemailer = require('nodemailer');
-const { getBlacklistData, ensureDataReady } = require('./scrapper');// Make sure path is correct
 const cron = require('node-cron');
 const path = require('path');
 const axios = require('axios');
+
+// Import ONLY from the chrome-free solution
+const { 
+  getBlacklistData, 
+  ensureDataReady, 
+  startPeriodicUpdates, 
+  initializeCache 
+} = require('./chrome-free-data');
 
 // Load environment variables
 dotenv.config();
@@ -28,10 +35,24 @@ const corsOptions = {
     'https://dncalliance.onrender.com'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-auth-token', 'Accept'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'x-auth-token', 
+    'Accept', 
+    'Cache-Control', 
+    'Pragma', 
+    'Expires'
+  ],
+  exposedHeaders: ['Content-Length', 'Date'],
   credentials: true,
+  maxAge: 86400, // 24 hours in seconds
   optionsSuccessStatus: 200
 };
+
+// Initialize cache and start periodic updates
+initializeCache(755, "39,806,098");
+startPeriodicUpdates(60); // Update every 60 minutes
 
 // Middleware
 app.use(express.json());
@@ -70,54 +91,81 @@ const createTransporter = () => {
   });
 };
 
-// Schedule scraping every hour
+// Schedule periodic updates using cron - this triggers our chrome-free solution
 cron.schedule('0 * * * *', async () => {
-  console.log('Running scheduled scrape...');
+  console.log('Running scheduled update...');
   try {
-    await getBlacklistData(false); // Force fresh data
-    console.log('Scheduled scrape completed successfully');
+    await getBlacklistData(true); // Force refresh
+    console.log('Scheduled update completed successfully');
   } catch (error) {
-    console.error('Scheduled scrape failed:', error);
+    console.error('Scheduled update failed:', error);
   }
 });
 
-// Add these new endpoints to your server.js file
-
-// Import the updated scrapper functions
-
-// Pre-warm endpoint - can be called when login page loads or login fields are focused
+// Pre-warm endpoint - returns cached data immediately
 app.get('/api/pre-warm', async (req, res) => {
   try {
     console.log('Pre-warming blacklist data cache');
     
-    // This will start scraping in the background if needed and return cached data immediately
+    // This will just return cached data immediately
     const data = await ensureDataReady();
     
     res.json({
       status: 'success',
-      message: 'Pre-warming started',
-      data: data
+      message: 'Data retrieved from cache',
+      data
     });
   } catch (error) {
     console.error('Error pre-warming cache:', error);
     res.status(500).json({ 
       status: 'error',
-      message: 'Failed to pre-warm cache',
+      message: 'Failed to get cached data',
       error: error.message
     });
   }
 });
 
-// Keep your existing endpoint but modify it slightly
+// API endpoint to get blacklist data
+// Update this section in your server.js file
+
+// API endpoint to get blacklist data
+// Update this section in your server.js file
+
+// API endpoint to get blacklist stats
+// API endpoint to get blacklist stats
 app.get('/api/blacklist-stats', async (req, res) => {
   try {
     console.log('Received request for blacklist stats');
     const forceRefresh = req.query.refresh === 'true';
-    console.log('Force refresh:', forceRefresh);
+    console.log('Force refresh parameter:', forceRefresh);
     
-    const data = await getBlacklistData(!forceRefresh);
-    console.log('Returning blacklist data:', data);
+    // Set no-cache headers in the response
+    res.set({
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+      'Surrogate-Control': 'no-store'
+    });
     
+    // Get the data (force refresh if requested)
+    const data = await getBlacklistData(forceRefresh);
+    
+    // If forcing refresh, add a small delay to make loading state visible
+    if (forceRefresh) {
+      console.log('Forcing refresh, adding delay to show loading state');
+      
+      // Add a small delay (1.5 seconds) to ensure loading state is visible to user
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      console.log('Returning refreshed blacklist data:', data);
+      return res.json({
+        ...data,
+        refreshed: true,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    console.log('Returning cached blacklist data');
     res.json(data);
   } catch (error) {
     console.error('Error fetching blacklist data:', error);
@@ -127,7 +175,6 @@ app.get('/api/blacklist-stats', async (req, res) => {
     });
   }
 });
-
 // Contact form endpoint with robust error handling
 app.post('/api/contact', async (req, res) => {
   try {
@@ -295,7 +342,8 @@ app.get('/api/user', async (req, res) => {
     res.status(401).json({ message: 'Token is not valid' });
   }
 });
-// Add this to your server.js
+
+// Email lookup proxy endpoint
 app.post('/api/email-lookup', async (req, res) => {
   try {
     const { email, apiKey } = req.body;
@@ -328,6 +376,111 @@ app.post('/api/email-lookup', async (req, res) => {
         error: error.message 
       });
     }
+  }
+});
+// Protected route example
+app.get('/api/user', async (req, res) => {
+  try {
+    const token = req.header('x-auth-token');
+    
+    if (!token) {
+      return res.status(401).json({ message: 'No token, authorization denied' });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Get user
+    const user = await User.findById(decoded.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json(user);
+  } catch (error) {
+    console.error(error);
+    res.status(401).json({ message: 'Token is not valid' });
+  }
+});
+
+// Update user profile
+app.put('/api/user/profile', async (req, res) => {
+  try {
+    const token = req.header('x-auth-token');
+    
+    if (!token) {
+      return res.status(401).json({ message: 'No token, authorization denied' });
+    }
+
+    // Verify token
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Get user with password for verification
+    const user = await User.findById(decoded.id);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    console.log('Processing profile update for user:', user.email);
+
+    // Get update fields from request body
+    const { name, email, currentPassword, newPassword } = req.body;
+
+    // Check if email is already in use by another user
+    if (email !== user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Email is already in use' });
+      }
+    }
+
+    // Update fields
+    if (name) user.name = name;
+    if (email) user.email = email;
+
+    // If password change is requested
+    if (currentPassword && newPassword) {
+      // Verify current password
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+
+      // Hash new password
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(newPassword, salt);
+      console.log('Password updated successfully');
+    }
+
+    // Save updated user to database
+    await user.save();
+    
+    // Create a user object without the password to send back
+    const updatedUser = {
+      id: user._id,
+      name: user.name,
+      email: user.email
+    };
+
+    console.log('Profile updated successfully:', updatedUser);
+    
+    // Return success response with updated user data
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Error updating profile:', error);
+    
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ message: 'Token is not valid' });
+    }
+    
+    res.status(500).json({ message: 'Server error updating profile' });
   }
 });
 
