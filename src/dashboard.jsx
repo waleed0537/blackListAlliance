@@ -460,7 +460,7 @@ const handleRefreshBlacklistData = async () => {
         const cleanedNumber = phoneNumber.replace(/[^\+\d]/g, '');
 
         // Validate number format
-        const phoneRegex = /^\+\d{10,15}$/; // Validates numbers starting with + and having 10-15 digits
+        const phoneRegex = /^\d{10}$/; // Validates exactly 10 digits
 
         if (!cleanedNumber) {
             setNumberError("Please enter a phone number");
@@ -468,12 +468,12 @@ const handleRefreshBlacklistData = async () => {
         }
 
         if (!phoneRegex.test(cleanedNumber)) {
-            setNumberError("Please enter a valid phone number with country code (e.g., +1 for US)");
+            setNumberError("Please enter a 10-digit phone number");
             return;
         }
 
         // Extract the last 10 digits for API call
-        const apiPhoneNumber = cleanedNumber.slice(-10);
+        const apiPhoneNumber = cleanedNumber;
 
         setNumberResult(null);
         setNumberError(null);
@@ -681,9 +681,10 @@ const handleRefreshBlacklistData = async () => {
                                                     <input
                                                         type="text"
                                                         className="form-control"
-                                                        placeholder="Enter phone number (e.g., +1 for US)"
+                                                        placeholder="Enter a 10-digit phone number"
                                                         value={phoneNumber}
                                                         onChange={(e) => setPhoneNumber(e.target.value)}
+                                                        maxLength={10}
                                                     />
                                                 </div>
                                                 <div className="button-group">
@@ -727,26 +728,14 @@ const handleRefreshBlacklistData = async () => {
                                                                     <div className="result-message">
                                                                         <p className="result-title">Number is not blacklisted</p>
                                                                         <p className="result-detail">This number was not found in any blacklists.</p>
-                                                                        <div className="result-detail-item">
-                                                                            <span className="detail-label">Formatted Number:</span>
-                                                                            <span className="detail-value">{numberResult.formatted}</span>
-                                                                        </div>
-                                                                        {/* Optional: Show API-returned phone number for debugging */}
-                                                                        {numberResult.apiPhone && (
-                                                                            <div className="result-detail-item">
-                                                                                <span className="detail-label">API Phone:</span>
-                                                                                <span className="detail-value">{numberResult.apiPhone}</span>
-                                                                            </div>
-                                                                        )}
+                                                                      
+                                                                      
                                                                     </div>
                                                                 </div>
                                                             )}
 
                                                             {/* Debug section */}
-                                                            <details>
-                                                                <summary>Debug: Raw API Response</summary>
-                                                                <pre>{JSON.stringify(numberResult.rawResponse, null, 2)}</pre>
-                                                            </details>
+                                                            
                                                         </div>
                                                     </div>
                                                 )}
@@ -829,10 +818,7 @@ const handleRefreshBlacklistData = async () => {
                                                                     <div className="result-message">
                                                                         <p className="result-title">Email is not blacklisted</p>
                                                                         <p className="result-detail">This email was not found in any blacklists.</p>
-                                                                        <div className="result-detail-item">
-                                                                            <span className="detail-label">Formatted Email:</span>
-                                                                            <span className="detail-value">{emailResult.formatted}</span>
-                                                                        </div>
+                                                                        
                                                                         {emailResult.domain && (
                                                                             <div className="result-detail-item">
                                                                                 <span className="detail-label">Domain:</span>
@@ -850,10 +836,7 @@ const handleRefreshBlacklistData = async () => {
                                                             )}
 
                                                             {/* Debug section */}
-                                                            <details>
-                                                                <summary>Debug: Raw API Response</summary>
-                                                                <pre>{JSON.stringify(emailResult.rawResponse, null, 2)}</pre>
-                                                            </details>
+                                                     
                                                         </div>
                                                     </div>
                                                 )}
@@ -1043,7 +1026,7 @@ const handleRefreshBlacklistData = async () => {
                                         </div>
                                         <div className="card-details">
                                             <h3>LITIGATION FIREWALL</h3>
-                                            <p>View usage stats, scrub CSV files, upload internal DNC files, and access API docs</p>
+                                            <p>Check blacklisted numbers and emails, scrub number and email files.</p>
                                         </div>
                                     </div>
                                     <button className="card-action" onClick={() => toggleSection('litigation')}>

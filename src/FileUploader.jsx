@@ -845,61 +845,6 @@ const FileUploader = ({
           )}
         </p>
         
-        {fileType === 'phone' && (
-          <div className="options-grid">
-            <div className="option-checkbox">
-              <input 
-                type="checkbox" 
-                id="carrier-data-phone"
-                checked={outputOptions.carrier_data}
-                onChange={() => toggleOptionCheckbox('carrier_data')}
-                disabled={uploading}
-              />
-              <label htmlFor="carrier-data-phone">
-                <strong>Carrier Data:</strong> Available carrier data for clean numbers
-              </label>
-            </div>
-            
-            <div className="option-checkbox">
-              <input 
-                type="checkbox" 
-                id="wireless-phone"
-                checked={outputOptions.wireless}
-                onChange={() => toggleOptionCheckbox('wireless')}
-                disabled={uploading}
-              />
-              <label htmlFor="wireless-phone">
-                <strong>Wireless:</strong> Clean numbers assigned to a cellular services
-              </label>
-            </div>
-            
-            <div className="option-checkbox">
-              <input 
-                type="checkbox" 
-                id="landlines-phone"
-                checked={outputOptions.landlines}
-                onChange={() => toggleOptionCheckbox('landlines')}
-                disabled={uploading}
-              />
-              <label htmlFor="landlines-phone">
-                <strong>Landlines:</strong> Clean numbers that present as landlines
-              </label>
-            </div>
-            
-            <div className="option-checkbox">
-              <input 
-                type="checkbox" 
-                id="dnc-phone"
-                checked={outputOptions.dnc}
-                onChange={() => toggleOptionCheckbox('dnc')}
-                disabled={uploading}
-              />
-              <label htmlFor="dnc-phone">
-                <strong>DNC:</strong> Numbers that are also on the National DNC Registry and NOT matched with other databases. Note: DNC numbers will NOT be included in the "all_clean" file. If you do not have a SAN number this file will be empty.
-              </label>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="upload-actions">
@@ -992,12 +937,7 @@ const FileUploader = ({
       {/* Recent files section */}
       {recentlyScrubbed.length > 0 && (
         <div className="recent-files-section">
-          <div className="section-header" onClick={() => setShowRecentFiles(!showRecentFiles)}>
-            <h4>
-              <FaHistory className="icon" /> Last {recentlyScrubbed.length} files that were scrubbed:
-            </h4>
-            <FaChevronDown className={`icon ${showRecentFiles ? 'rotated' : ''}`} />
-          </div>
+          
           
           {showRecentFiles && (
             <div className="recent-files-table">
