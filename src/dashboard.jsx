@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react';
 import './styles/dashboard.css';
 import './styles/pricing.css';
+import './styles/CallerIdCheckCard.css';
 import axios from 'axios';
         
 import {
@@ -31,11 +32,15 @@ import {
     FaBriefcase,
     FaMapMarked,
     FaInfoCircle,
-    FaLock
+    FaLock,
+    FaSearch,
+    FaExclamationTriangle,
+    FaSpinner
 } from 'react-icons/fa';
 import FileUploader from './FileUploader';
 import AuthContext from './AuthContext';
 import { useBlacklistData } from './BlacklistContext';
+import CallerIdCheckCard from './CallerIdCheckCard';
 
 const Dashboard = () => {
     const { user, logout } = useContext(AuthContext);
@@ -56,10 +61,13 @@ const Dashboard = () => {
     const [scrubNumberOpen, setScrubNumberOpen] = useState(false);
     const [scrubEmailOpen, setScrubEmailOpen] = useState(false);
     const [apiStatsOpen, setApiStatsOpen] = useState(false);
+    // NEW state for caller ID check details toggle - separate from numberCheckOpen
+    const [callerIdDetailsOpen, setCallerIdDetailsOpen] = useState(false);
     const [phoneNumber, setPhoneNumber] = useState('');
     const [email, setEmail] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showFirewall, setShowFirewall] = useState(false);
+    const [showCallerIdCheck, setShowCallerIdCheck] = useState(false);
     const [showPricing, setShowPricing] = useState(false);
     const [showAccountDetails, setShowAccountDetails] = useState(false);
     const [numberResult, setNumberResult] = useState(null);
@@ -221,32 +229,25 @@ const Dashboard = () => {
     };
 
     // Function to manually refresh blacklist data
-    // Update this section in your Dashboard.jsx file (just the refresh button handler)
-
-// Function to manually refresh blacklist data
-// Updated Dashboard.jsx handleRefreshBlacklistData function
-// This fixes the "setBlacklistData is not defined" error
-
-// Function to manually refresh blacklist data
-const handleRefreshBlacklistData = async () => {
-    setIsRefreshingStats(true);
-    try {
-      console.log('Manual refresh button clicked, forcing refresh...');
-      
-      // No need to set blacklistData directly - refreshData will handle it
-      // Wait a moment to ensure loading state is visible
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Trigger refresh with force=true
-      await refreshData(true); 
-      
-      console.log('Manual refresh completed successfully');
-    } catch (error) {
-      console.error('Error refreshing blacklist data:', error);
-    } finally {
-      setIsRefreshingStats(false);
-    }
-  };
+    const handleRefreshBlacklistData = async () => {
+        setIsRefreshingStats(true);
+        try {
+          console.log('Manual refresh button clicked, forcing refresh...');
+          
+          // No need to set blacklistData directly - refreshData will handle it
+          // Wait a moment to ensure loading state is visible
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Trigger refresh with force=true
+          await refreshData(true); 
+          
+          console.log('Manual refresh completed successfully');
+        } catch (error) {
+          console.error('Error refreshing blacklist data:', error);
+        } finally {
+          setIsRefreshingStats(false);
+        }
+    };
     
     const handleNumberUploadComplete = (data) => {
         console.log('Number scrub completed:', data);
@@ -279,10 +280,25 @@ const handleRefreshBlacklistData = async () => {
             // Show loading screen
             setIsLoading(true);
 
+            // Reset other sections
+            setShowCallerIdCheck(false);
+
             // Simulate loading delay
             setTimeout(() => {
                 setIsLoading(false);
                 setShowFirewall(true);
+            }, 800);
+        } else if (section === 'callerid') {
+            // Show loading screen
+            setIsLoading(true);
+
+            // Reset other sections
+            setShowFirewall(false);
+
+            // Simulate loading delay
+            setTimeout(() => {
+                setIsLoading(false);
+                setShowCallerIdCheck(true);
             }, 800);
         } else if (activeSection === section) {
             setActiveSection(null);
@@ -293,6 +309,9 @@ const handleRefreshBlacklistData = async () => {
 
     const goBackToDashboard = () => {
         setShowFirewall(false);
+        setShowCallerIdCheck(false);
+        // Reset the caller ID details state when going back to dashboard
+        setCallerIdDetailsOpen(false);
     };
 
     const toggleNumberCheck = () => {
@@ -455,6 +474,7 @@ const handleRefreshBlacklistData = async () => {
         }
     };
 
+    // UPDATED: Phone lookup function that handles both litigation firewall and caller ID check
     const handlePhoneLookup = () => {
         // Remove any non-digit characters except the plus sign at the start
         const cleanedNumber = phoneNumber.replace(/[^\+\d]/g, '');
@@ -478,43 +498,81 @@ const handleRefreshBlacklistData = async () => {
         setNumberResult(null);
         setNumberError(null);
         setNumberLoading(true);
+        // Reset the details section toggle when starting a new lookup
+        setCallerIdDetailsOpen(false);
 
-        const options = { method: 'GET', headers: { accept: 'application/json' } };
-        fetch(`https://api.blacklistalliance.net/standard/api/v3/Lookup/key/${apiKey}/phone/${encodeURIComponent(apiPhoneNumber)}/response/json`, options)
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`Error: ${res.status} ${res.statusText}`);
+        // For the Caller ID Check page, we'll use the NEE (Number Evaluation Engine) API
+        // which has a different endpoint and response format
+        if (showCallerIdCheck) {
+            console.log('Using NEE API for Caller ID Check');
+            
+            axios.get(`https://api.blacklistalliance.net/nee?key=${apiKey}&phone=${encodeURIComponent(apiPhoneNumber)}`, {
+                headers: {
+                    'accept': 'application/json'
                 }
-                return res.json();
             })
-            .then(data => {
-                // Log the ENTIRE API response to console
-                console.log('Full API Response:', JSON.stringify(data, null, 2));
-
-                // Log additional details to help with debugging
-                console.log('API Response Type:', typeof data);
-                console.log('API Response Keys:', Object.keys(data));
-
-                // Adapt the data structure to match the existing UI expectations
+            .then(response => {
+                const data = response.data;
+                console.log('NEE API Response:', JSON.stringify(data, null, 2));
+                
+                // Check if there are FTC complaints or FCC (Cbg) reports
+                const hasFtcComplaint = data.FtcComplaint !== null;
+                const hasCbgReports = data.Cbg !== null && data.Cbg.length > 0;
+                
+                console.log('Has FTC complaint:', hasFtcComplaint);
+                console.log('Has CBG reports:', hasCbgReports);
+                
+                // Create result object with all data needed for display
                 const formattedResult = {
-                    // Check if the status indicates a successful lookup and no results means not blacklisted
-                    match: data.status === 'success' && data.results > 0,
-                    lists: [], // Add logic to populate lists if available
-                    formatted: cleanedNumber, // Use the original full number
-                    apiPhone: data.phone, // Store the API-returned phone number for reference
+                    match: hasFtcComplaint || hasCbgReports,
+                    formatted: cleanedNumber,
+                    apiPhone: data.Phone,
                     rawResponse: data
                 };
-
+                
                 setNumberResult(formattedResult);
                 setNumberLoading(false);
             })
-            .catch(err => {
-                // Log any errors to console
-                console.error('API Call Error:', err);
-
-                setNumberError(`Failed to lookup number: ${err.message}`);
+            .catch(error => {
+                console.error('NEE API Call Error:', error);
+                setNumberError(`Failed to check number: ${error.message || 'Unknown error'}`);
                 setNumberLoading(false);
             });
+        } else {
+            // For the Litigation Firewall, use the original API
+            const options = { method: 'GET', headers: { accept: 'application/json' } };
+            fetch(`https://api.blacklistalliance.net/standard/api/v3/Lookup/key/${apiKey}/phone/${encodeURIComponent(apiPhoneNumber)}/response/json`, options)
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`Error: ${res.status} ${res.statusText}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    // Log the ENTIRE API response to console
+                    console.log('Full API Response:', JSON.stringify(data, null, 2));
+
+                    // Adapt the data structure to match the existing UI expectations
+                    const formattedResult = {
+                        // Check if the status indicates a successful lookup and no results means not blacklisted
+                        match: data.status === 'success' && data.results > 0,
+                        lists: [], // Add logic to populate lists if available
+                        formatted: cleanedNumber, // Use the original full number
+                        apiPhone: data.phone, // Store the API-returned phone number for reference
+                        rawResponse: data
+                    };
+
+                    setNumberResult(formattedResult);
+                    setNumberLoading(false);
+                })
+                .catch(err => {
+                    // Log any errors to console
+                    console.error('API Call Error:', err);
+
+                    setNumberError(`Failed to lookup number: ${err.message}`);
+                    setNumberLoading(false);
+                });
+        }
     };
 
     const handleEmailLookup = () => {
@@ -576,10 +634,12 @@ const handleRefreshBlacklistData = async () => {
         });
     };
     
+    // UPDATED: Clear phone function also resets caller ID details toggle
     const clearPhone = () => {
         setPhoneNumber('');
         setNumberResult(null);
         setNumberError(null);
+        setCallerIdDetailsOpen(false);
     };
 
     const clearEmail = () => {
@@ -625,7 +685,7 @@ const handleRefreshBlacklistData = async () => {
                     </div>
                     <nav className="sidebar-nav">
                         <ul>
-                            <li className={`nav-item ${!showFirewall ? 'active' : ''}`} onClick={goBackToDashboard}>
+                            <li className={`nav-item ${!showFirewall && !showCallerIdCheck ? 'active' : ''}`} onClick={goBackToDashboard}>
                                 <FaHome />
                                 <span>Dashboard</span>
                             </li>
@@ -640,6 +700,7 @@ const handleRefreshBlacklistData = async () => {
                                 {functionsOpen && (
                                     <ul className="submenu">
                                         <li className={showFirewall ? 'active' : ''} onClick={() => toggleSection('litigation')}>Litigation Firewall</li>
+                                        <li className={showCallerIdCheck ? 'active' : ''} onClick={() => toggleSection('callerid')}>Caller ID Check</li>
                                         <li onClick={toggleAccountDetails}>Account Details</li>
                                         <li onClick={handleAccessNumberVerifier}>Number Verifier</li>
                                         <li onClick={togglePricing}>Account & Billing</li>
@@ -659,7 +720,7 @@ const handleRefreshBlacklistData = async () => {
                     {isLoading ? (
                         <div className="loading-container">
                             <div className="loader"></div>
-                            <p>Loading Litigation Firewall...</p>
+                            <p>Loading {showFirewall ? 'Litigation Firewall' : 'Caller ID Check'}...</p>
                         </div>
                     ) : showFirewall ? (
                         <div className="firewall-view">
@@ -733,9 +794,6 @@ const handleRefreshBlacklistData = async () => {
                                                                     </div>
                                                                 </div>
                                                             )}
-
-                                                            {/* Debug section */}
-                                                            
                                                         </div>
                                                     </div>
                                                 )}
@@ -834,9 +892,6 @@ const handleRefreshBlacklistData = async () => {
                                                                     </div>
                                                                 </div>
                                                             )}
-
-                                                            {/* Debug section */}
-                                                     
                                                         </div>
                                                     </div>
                                                 )}
@@ -880,6 +935,196 @@ const handleRefreshBlacklistData = async () => {
                                         )}
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    ) : showCallerIdCheck ? (
+                        <div className="caller-id-view">
+                            <h2 className="page-title">Caller ID Check</h2>
+                            
+                            <div className="caller-id-section">
+                                <div className="info-box">
+                                    <FaExclamationTriangle className="info-icon" />
+                                    <p>
+                                        This tool checks whether a number has been reported to the FTC or FCC 
+                                        in connection with a telemarketing complaint. Enter a 10-digit phone 
+                                        number to evaluate.
+                                    </p>
+                                </div>
+                                
+                                <div className="search-box">
+                                    <div className="input-group">
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="Enter 10-digit phone number"
+                                            value={phoneNumber}
+                                            onChange={(e) => setPhoneNumber(e.target.value)}
+                                            onKeyPress={(e) => {
+                                                if (e.key === 'Enter' && !numberLoading) {
+                                                    handlePhoneLookup();
+                                                }
+                                            }}
+                                        />
+                                        {phoneNumber && (
+                                            <button 
+                                                className="clear-button" 
+                                                onClick={clearPhone} 
+                                                disabled={numberLoading}
+                                            >
+                                                <FaTimes />
+                                            </button>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="button-group">
+                                        <button 
+                                            className="primary-button" 
+                                            onClick={handlePhoneLookup}
+                                            disabled={numberLoading}
+                                        >
+                                            {numberLoading ? (
+                                                <>
+                                                    <FaSpinner className="spinning" /> Checking...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FaSearch /> Check Number
+                                                </>
+                                            )}
+                                        </button>
+                                        <button 
+                                            className="secondary-button"
+                                            onClick={goBackToDashboard}
+                                        >
+                                            Back to Dashboard
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                {numberError && (
+                                    <div className="error-message">
+                                        <p>{numberError}</p>
+                                    </div>
+                                )}
+                                
+                                {numberLoading && (
+                                    <div className="result-loading">
+                                        <div className="mini-loader"></div>
+                                        <p>Checking number...</p>
+                                    </div>
+                                )}
+                                
+                                {numberResult && (
+                                    <div className="result-container">
+                                        <div className={`result-header ${numberResult.match ? 'reported' : 'not-reported'}`}>
+                                            {numberResult.match ? (
+                                                <>
+                                                    <FaExclamationTriangle className="result-icon warning" />
+                                                    <span>The number has been reported to the FTC or FCC</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <FaCheckCircle className="result-icon success" />
+                                                    <span>The number has not been reported to the FTC or FCC</span>
+                                                </>
+                                            )}
+                                            
+                                            {/* Use callerIdDetailsOpen state for the details toggle */}
+                                            {numberResult.match && (
+                                                <button 
+                                                    className="toggle-details-button"
+                                                    onClick={() => setCallerIdDetailsOpen(!callerIdDetailsOpen)}
+                                                    aria-label="Toggle details"
+                                                >
+                                                    {callerIdDetailsOpen ? <FaChevronUp /> : <FaChevronDown />}
+                                                </button>
+                                            )}
+                                        </div>
+                                        
+                                        {/* Show details using callerIdDetailsOpen state */}
+                                        {numberResult.match && callerIdDetailsOpen && (
+                                            <div className="result-details">
+                                                {numberResult.rawResponse && numberResult.rawResponse.FtcComplaint && (
+                                                    <div className="detail-section">
+                                                        <h3>FTC Complaint</h3>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Report Count:</span>
+                                                            <span className="detail-value">{numberResult.rawResponse.FtcComplaint.count || "N/A"}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Subject:</span>
+                                                            <span className="detail-value">{numberResult.rawResponse.FtcComplaint.subject || "N/A"}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Recorded Message Or Robocall:</span>
+                                                            <span className="detail-value">{numberResult.rawResponse.FtcComplaint.recorded_message_or_robo || "N/A"}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Reported On FTC:</span>
+                                                            <span className="detail-value">{numberResult.rawResponse.FtcComplaint.create_date || "N/A"}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Violation Date:</span>
+                                                            <span className="detail-value">{numberResult.rawResponse.FtcComplaint.violation_date || "N/A"}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Consumer City:</span>
+                                                            <span className="detail-value">{numberResult.rawResponse.FtcComplaint.consumer_city || "N/A"}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Consumer State:</span>
+                                                            <span className="detail-value">{numberResult.rawResponse.FtcComplaint.consumer_state || "N/A"}</span>
+                                                        </div>
+                                                        <div className="detail-row">
+                                                            <span className="detail-label">Consumer Area Code:</span>
+                                                            <span className="detail-value">{numberResult.rawResponse.FtcComplaint.consumer_area_code || "N/A"}</span>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {numberResult.rawResponse && numberResult.rawResponse.Cbg && numberResult.rawResponse.Cbg.length > 0 && (
+                                                    <div className="detail-section">
+                                                        <h3>FCC Reports</h3>
+                                                        {numberResult.rawResponse.Cbg.map((report, index) => (
+                                                            <div key={index} className="fcc-report">
+                                                                <h4>Report #{index + 1}</h4>
+                                                                <div className="detail-row">
+                                                                    <span className="detail-label">Create Date:</span>
+                                                                    <span className="detail-value">
+                                                                        {new Date(report.ticket_created).toLocaleString() || "N/A"}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="detail-row">
+                                                                    <span className="detail-label">Issue:</span>
+                                                                    <span className="detail-value">{report.issue || "N/A"}</span>
+                                                                </div>
+                                                                <div className="detail-row">
+                                                                    <span className="detail-label">Type of Call:</span>
+                                                                    <span className="detail-value">{report.type_of_call_or_messge || "N/A"}</span>
+                                                                </div>
+                                                                <div className="detail-row">
+                                                                    <span className="detail-label">Location:</span>
+                                                                    <span className="detail-value">
+                                                                        {`${report.city || ""}, ${report.state || ""} ${report.zip || ""}`.trim() || "N/A"}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                
+                                                {(!numberResult.rawResponse || 
+                                                  (!numberResult.rawResponse.FtcComplaint && 
+                                                   (!numberResult.rawResponse.Cbg || numberResult.rawResponse.Cbg.length === 0))
+                                                 ) && (
+                                                    <div className="detail-section">
+                                                        <p>No detailed complaint information available.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                     ) : (
@@ -1016,7 +1261,7 @@ const handleRefreshBlacklistData = async () => {
                             </div>
 
                             <div className="cards-grid">
-                                {/* Litigation Firewall Card */}
+                                {/* 1. LITIGATION FIREWALL Card */}
                                 <div className="card">
                                     <div className="card-content">
                                         <div className="card-icon">
@@ -1034,9 +1279,28 @@ const handleRefreshBlacklistData = async () => {
                                     </button>
                                 </div>
 
-                             
+                                {/* 2. CALLER ID CHECK Card */}
+                                <CallerIdCheckCard onNavigate={toggleSection} />
 
-                                {/* Contact Us Card - NEW */}
+                                {/* 3. NUMBER VERIFIER Card */}
+                                <div className="card">
+                                    <div className="card-content">
+                                        <div className="card-icon">
+                                            <div className="icon-bg verifier">
+                                                <FaPhoneAlt />
+                                            </div>
+                                        </div>
+                                        <div className="card-details">
+                                            <h3>NUMBER VERIFIER</h3>
+                                            <p>Identify Caller IDs wrongly tagged as spam by carrier algorithms, manage Caller IDs in real time, increase answer rates and boost conversions.</p>
+                                        </div>
+                                    </div>
+                                    <button className="card-action" onClick={handleAccessNumberVerifier}>
+                                        Access Number Verifier <FaArrowRight />
+                                    </button>
+                                </div>
+
+                                {/* 4. CONTACT US Card */}
                                 <div className="card">
                                     <div className="card-content">
                                         <div className="card-icon">
@@ -1054,7 +1318,7 @@ const handleRefreshBlacklistData = async () => {
                                     </button>
                                 </div>
 
-                                {/* Account Card */}
+                                {/* 5. ACCOUNT Card */}
                                 <div className="card">
                                     <div className="card-content">
                                         <div className="card-icon">
@@ -1064,34 +1328,11 @@ const handleRefreshBlacklistData = async () => {
                                         </div>
                                         <div className="card-details">
                                             <h3>ACCOUNT</h3>
-                                        
                                             <p>View account profile and edit your details</p>
                                         </div>
                                     </div>
                                     <button className="card-action" onClick={toggleAccountDetails}>
                                         View Account Details <FaArrowRight />
-                                    </button>
-                                </div>
-
-
-                                
-
-                                {/* Number Verifier Card */}
-                                <div className="card">
-                                    <div className="card-content">
-                                        <div className="card-icon">
-                                            <div className="icon-bg verifier">
-                                                <FaPhoneAlt />
-                                            </div>
-                                        </div>
-                                        <div className="card-details">
-                                            <h3>NUMBER VERIFIER</h3>
-                                            <p>Identify Caller IDs wrongly tagged as spam by carrier algorithms, manage Caller IDs in real time, increase answer rates and boost conversions.</p>
-                                            
-                                        </div>
-                                    </div>
-                                    <button className="card-action" onClick={handleAccessNumberVerifier}>
-                                        Access Number Verifier <FaArrowRight />
                                     </button>
                                 </div>
                             </div>
